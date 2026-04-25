@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Loyalty Rewards</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --ember-light: #E8703A;
+            --gold: #B8924A;
+            --silver-col: #8E9BA8;
+            --bronze-col: #A0673A;
+            --muted: #6B6259;
+            --border: rgba(26, 20, 16, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.05"/></svg>');
+            z-index: 100;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 500;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 440px;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--cream);
+            border: 1px solid var(--ember);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            color: var(--ember);
+        }
+
+        .logo svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+            width: 100%;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            padding: 24px;
+            margin-bottom: 24px;
+            opacity: 0;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .anim-1 {
+            animation: fadeUp 0.4s ease forwards;
+        }
+
+        .anim-2 {
+            animation: fadeUp 0.4s ease 0.1s forwards;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+
+        input {
+            width: 100%;
+            height: 48px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background-color: var(--cream);
+            padding: 0 16px;
+            font-family: inherit;
+            font-size: 15px;
+            color: var(--dark);
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--ember);
+            box-shadow: 0 0 0 3px rgba(196, 83, 26, 0.1);
+        }
+
+        .date-display {
+            width: 100%;
+            height: 48px;
+            border-radius: 10px;
+            background-color: var(--cream);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 15px;
+            color: var(--muted);
+            user-select: none;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group span {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            pointer-events: none;
+        }
+
+        .input-group input {
+            padding-left: 32px;
+        }
+
+        button.primary {
+            width: 100%;
+            height: 52px;
+            background-color: var(--ember);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button.primary:hover {
+            background-color: var(--ember-light);
+        }
+
+        button.primary:active {
+            transform: scale(0.98);
+        }
+
+        button.ghost {
+            background: transparent;
+            color: var(--dark);
+            border: 1px solid var(--border);
+        }
+
+        button.ghost:hover {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .badge {
+            border-radius: 999px;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            padding: 4px 10px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .badge-none {
+            background: #F0EDE9;
+            color: #6B6259;
+            border: 1px solid transparent;
+        }
+
+        .badge-bronze {
+            background: #FAF0E8;
+            color: #7A3F1A;
+            border: 1px solid #D4976A;
+        }
+
+        .badge-silver {
+            background: #EEF1F4;
+            color: #3A4F5E;
+            border: 1px solid #8E9BA8;
+        }
+
+        .badge-gold {
+            background: #FDF6E3;
+            color: #6B4A10;
+            border: 1px solid #C8A84B;
+        }
+
+        .badge-vip {
+            background: #1A1410;
+            color: #C8A84B;
+            border: 1px solid #8A6A20;
+        }
+
+        .tier-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tier-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .tier-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tier-name {
+            font-weight: 500;
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+
+        .tier-req {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .footer-link {
+            font-size: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            margin-top: 16px;
+            margin-bottom: 40px;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: var(--dark);
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .alert-error {
+            background: #FEECEB;
+            color: #B3261E;
+            border: 1px solid #F9DEDC;
+        }
+
+        /* Success View specifics */
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #E8F5E9;
+            color: #2E7D32;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+
+        .success-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .success-name {
+            font-size: 2rem;
+            font-family: 'Cormorant Garamond', serif;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .center-badge {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            background: var(--cream);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-weight: 500;
+            font-size: 16px;
+            color: var(--dark);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 24px 0;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 5px;
+            background: var(--cream);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(to right, var(--ember), var(--gold));
+            border-radius: 3px;
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .banner {
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .banner-amber {
+            background: #FFF8E1;
+            color: #B28900;
+            border: 1px solid #FFE082;
+        }
+
+        .banner-green {
+            background: #E8F5E9;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+        }
+
+        .discount-box {
+            text-align: center;
+            padding: 16px;
+            font-weight: 500;
+            font-size: 15px;
+            background: #FFF8E1;
+            color: #B28900;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            border: 1px dashed #FFE082;
+        }
+
+        .vip-box {
+            text-align: center;
+            padding: 16px;
+            font-weight: 600;
+            font-size: 15px;
+            font-family: 'Cormorant Garamond', serif;
+            letter-spacing: 0.05em;
+            background: #1A1410;
+            color: #C8A84B;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            border: 1px solid #8A6A20;
+        }
+
+        #view-success {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="logo">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+            </svg>
+        </div>
+
+        <div class="header">
+            <h1 id="restaurant-header-name">The Restaurant</h1>
+            <p>Loyalty Rewards</p>
+        </div>
+
+        <div id="view-form">
+            <div class="card anim-1">
+                <div id="form-alert"></div>
+                <form id="checkin-form">
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" autocomplete="name" placeholder="E.g. Sarah Jones">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" autocomplete="email" placeholder="sarah@example.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="spend">Today's Spend</label>
+                        <div class="input-group">
+                            <span>£</span>
+                            <input type="number" id="spend" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Date</label>
+                        <div class="date-display" id="date-display"></div>
+                    </div>
+
+                    <button type="submit" class="primary" id="submit-btn" style="margin-top: 8px;">Check In</button>
+                </form>
+            </div>
+
+            <div class="card anim-2">
+                <div class="tier-row">
+                    <div class="tier-info">
+                        <div class="tier-name">Bronze</div>
+                        <div class="tier-req" id="req-bronze">Spend £300 in 3 months</div>
+                    </div>
+                    <div class="badge badge-bronze" id="disc-bronze">10% OFF</div>
+                </div>
+                <div class="tier-row">
+                    <div class="tier-info">
+                        <div class="tier-name">Silver</div>
+                        <div class="tier-req" id="req-silver">Spend £600 in 3 months</div>
+                    </div>
+                    <div class="badge badge-silver" id="disc-silver">15% OFF</div>
+                </div>
+                <div class="tier-row">
+                    <div class="tier-info">
+                        <div class="tier-name">Gold</div>
+                        <div class="tier-req" id="req-gold">Spend £1,000 in 3 months</div>
+                    </div>
+                    <div class="badge badge-gold" id="disc-gold">20% OFF</div>
+                </div>
+                <div class="tier-row">
+                    <div class="tier-info">
+                        <div class="tier-name">VIP</div>
+                        <div class="tier-req" id="req-vip">Spend £2,000 in 3 months</div>
+                    </div>
+                    <div class="badge badge-vip" id="disc-vip">25% OFF</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-success" class="card anim-1">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+
+            <h2 class="success-name" id="result-name">Sarah Jones</h2>
+
+            <div class="center-badge">
+                <div class="badge badge-none" id="result-badge">NO TIER</div>
+            </div>
+
+            <div id="alert-banner"></div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Today's Spend</span>
+                    <span class="stat-value" id="stat-today">£0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">3-Month Total</span>
+                    <span class="stat-value" id="stat-total">£0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Visits</span>
+                    <span class="stat-value" id="stat-visits">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Member Since</span>
+                    <span class="stat-value" id="stat-since">Date</span>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div id="progress-container">
+                <div class="progress-header">
+                    <span id="progress-label">Progress to Tier</span>
+                    <span id="progress-togo">£0 to go</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <div id="vip-container" style="display: none;">
+                <div class="vip-box">✦ VIP status achieved ✦</div>
+            </div>
+
+            <div id="discount-container" style="display: none;">
+                <div class="discount-box" id="discount-msg"></div>
+            </div>
+
+            <button type="button" class="primary ghost" id="reset-btn">← New check-in</button>
+        </div>
+
+        <div
+            style="display: flex; gap: 16px; margin-top: 8px; margin-bottom: 40px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; border-radius: 999px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); align-items: center;">
+            <a href="status.html" class="footer-link" style="margin: 0; color: var(--dark); font-weight: 500;">Check
+                your status</a>
+            <span style="color: var(--muted); font-size: 12px;">|</span>
+            <a href="admin.html" class="footer-link" style="margin: 0; color: var(--dark); font-weight: 500;">Staff
+                access &rarr;</a>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const settings = App.getSettings();
+
+            document.getElementById("restaurant-header-name").innerText = settings.restaurant_name;
+            const todayStr = new Intl.DateTimeFormat('en-GB', { dateStyle: 'full' }).format(new Date());
+            document.getElementById("date-display").innerText = todayStr;
+
+            document.getElementById("req-bronze").innerText = `Spend £${settings.bronze_threshold} in 3 months`;
+            document.getElementById("req-silver").innerText = `Spend £${settings.silver_threshold} in 3 months`;
+            document.getElementById("req-gold").innerText = `Spend £${settings.gold_threshold} in 3 months`;
+            document.getElementById("req-vip").innerText = `Spend £${settings.vip_threshold} in 3 months`;
+
+            document.getElementById("disc-bronze").innerText = `${settings.discount_bronze}% OFF`;
+            document.getElementById("disc-silver").innerText = `${settings.discount_silver}% OFF`;
+            document.getElementById("disc-gold").innerText = `${settings.discount_gold}% OFF`;
+            document.getElementById("disc-vip").innerText = `${settings.discount_vip}% OFF`;
+
+            document.getElementById("checkin-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const name = document.getElementById("name").value.trim();
+                const email = document.getElementById("email").value.trim();
+                const spend = document.getElementById("spend").value.trim();
+
+                if (!name) return App.setAlert("form-alert", "Name must not be empty", "error");
+                if (!email || !email.includes("@")) return App.setAlert("form-alert", "Valid email is required", "error");
+                if (!spend || isNaN(spend) || parseFloat(spend) < 0) return App.setAlert("form-alert", "Spend must be a valid number >= 0", "error");
+
+                document.getElementById("submit-btn").disabled = true;
+
+                try {
+                    const result = await App.submitVisit(name, email, parseFloat(spend).toFixed(2));
+
+                    document.getElementById("result-name").innerText = name;
+
+                    const badge = document.getElementById("result-badge");
+                    badge.className = `badge badge-${result.tier}`;
+                    badge.innerText = App.tierLabel(result.tier);
+
+                    const banner = document.getElementById("alert-banner");
+                    banner.style.display = "none";
+                    banner.className = "banner";
+                    banner.innerHTML = "";
+
+                    if (result.isNew) {
+                        banner.style.display = "block";
+                        banner.classList.add("banner-amber");
+                        banner.innerHTML = `Welcome! Enjoy ${result.discount}% off your next visit today.`;
+                    } else if (result.tierUp) {
+                        banner.style.display = "block";
+                        banner.classList.add("banner-green");
+                        banner.innerHTML = `Congratulations! You've reached ${App.tierLabel(result.tier)} status. A confirmation email has been sent.`;
+                    } else {
+                        banner.style.display = "block";
+                        banner.classList.add("banner-green");
+                        banner.innerHTML = "Your visit was recorded successfully.";
+                    }
+
+                    document.getElementById("stat-today").innerText = `£${parseFloat(spend).toFixed(2)}`;
+                    document.getElementById("stat-total").innerText = `£${result.spend90d.toFixed(2)}`;
+                    document.getElementById("stat-visits").innerText = result.totalVisits;
+                    document.getElementById("stat-since").innerText = new Intl.DateTimeFormat('en-GB').format(new Date(result.firstVisit));
+
+                    const pCont = document.getElementById("progress-container");
+                    const vipCont = document.getElementById("vip-container");
+                    const discCont = document.getElementById("discount-container");
+
+                    if (result.tier === "vip") {
+                        pCont.style.display = "none";
+                        vipCont.style.display = "block";
+                    } else {
+                        pCont.style.display = "block";
+                        vipCont.style.display = "none";
+                        document.getElementById("progress-label").innerText = `Progress to ${App.tierLabel(result.nextTier)}`;
+                        const toGo = (result.nextThreshold - result.spend90d).toFixed(2);
+                        document.getElementById("progress-togo").innerText = `£${toGo} to go`;
+
+                        let prevThresh = 0;
+                        if (result.tier === 'bronze') prevThresh = settings.bronze_threshold;
+                        else if (result.tier === 'silver') prevThresh = settings.silver_threshold;
+                        else if (result.tier === 'gold') prevThresh = settings.gold_threshold;
+
+                        const range = result.nextThreshold - prevThresh;
+                        const progressInTier = result.spend90d - prevThresh;
+                        let pct = (progressInTier / range) * 100;
+                        if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+
+                        setTimeout(() => {
+                            document.getElementById("progress-fill").style.width = `${pct}%`;
+                        }, 50);
+                    }
+
+                    if (!result.isNew && result.discount > 0) {
+                        discCont.style.display = "block";
+                        document.getElementById("discount-msg").innerText = `Your ${App.tierLabel(result.tier)} discount: ${result.discount}% off — show this to your server`;
+                    } else {
+                        discCont.style.display = "none";
+                    }
+
+                    document.getElementById("view-form").style.display = "none";
+                    document.getElementById("view-success").style.display = "block";
+                } finally {
+                    document.getElementById("submit-btn").disabled = false;
+                }
+            });
+
+            document.getElementById("reset-btn").addEventListener("click", () => {
+                document.getElementById("checkin-form").reset();
+                document.getElementById("progress-fill").style.width = "0";
+                document.getElementById("view-success").style.display = "none";
+                document.getElementById("view-form").style.display = "block";
+                document.getElementById("submit-btn").disabled = false;
+                document.getElementById("form-alert").innerHTML = '';
+            });
+        });
+    </script>
+</body>
+
+</html>

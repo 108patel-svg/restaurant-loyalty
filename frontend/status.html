@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Status Portal</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --ember-light: #E8703A;
+            --border: rgba(26, 20, 16, 0.12);
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 400px;
+            padding: 32px 24px;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        p {
+            font-size: 14px;
+            margin-bottom: 24px;
+            color: #6B6259;
+        }
+
+        input {
+            width: 100%;
+            height: 48px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background-color: var(--cream);
+            padding: 0 16px;
+            font-size: 15px;
+            margin-bottom: 16px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--ember);
+            box-shadow: 0 0 0 3px rgba(196, 83, 26, 0.1);
+        }
+
+        button {
+            width: 100%;
+            height: 48px;
+            background-color: var(--ember);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--ember-light);
+        }
+
+        .alert {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: left;
+            display: none;
+        }
+
+        .alert-success {
+            background: #E8F5E9;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+            display: block;
+        }
+
+        .alert-error {
+            background: #FEECEB;
+            color: #B3261E;
+            border: 1px solid #F9DEDC;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>Check Your Loyalty Status</h1>
+        <p>Enter your email to receive a secure magic link to view your live tier and add your digital membership card
+            to your phone's wallet.</p>
+        <form id="status-form">
+            <input type="email" id="email" required placeholder="sarah@example.com">
+            <button type="submit" id="btn">Send Magic Link</button>
+        </form>
+        <div id="msg"></div>
+        <a href="index.html"
+            style="font-size: 12px; color: #6B6259; text-decoration: none; display:block; margin-top: 24px;">← Back to
+            check-in</a>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.getElementById("status-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("email").value;
+            const btn = document.getElementById("btn");
+            btn.disabled = true;
+            btn.innerText = "Sending...";
+
+            try {
+                const res = await fetch('/api/magic-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const msg = document.getElementById("msg");
+                if (res.ok) {
+                    msg.className = "alert alert-success";
+                    msg.innerText = "Magic link sent! Check your email.";
+                } else {
+                    const err = await res.json();
+                    msg.className = "alert alert-error";
+                    msg.innerText = err.error || "Failed to send link.";
+                }
+            } catch (err) {
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Send Magic Link";
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Digital Wallet - Rewards</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --border: rgba(26, 20, 16, 0.12);
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 400px;
+            padding: 32px 24px;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            border-radius: 999px;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            padding: 4px 10px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .badge-none {
+            background: #F0EDE9;
+            color: #6B6259;
+        }
+
+        .badge-bronze {
+            background: #FAF0E8;
+            color: #7A3F1A;
+            border: 1px solid #D4976A;
+        }
+
+        .badge-silver {
+            background: #EEF1F4;
+            color: #3A4F5E;
+            border: 1px solid #8E9BA8;
+        }
+
+        .badge-gold {
+            background: #FDF6E3;
+            color: #6B4A10;
+            border: 1px solid #C8A84B;
+        }
+
+        .badge-vip {
+            background: #1A1410;
+            color: #C8A84B;
+            border: 1px solid #8A6A20;
+        }
+
+        .discount-highlight {
+            font-size: 3rem;
+            font-weight: 600;
+            color: var(--ember);
+            margin-bottom: 24px;
+        }
+
+        .scan-msg {
+            font-size: 14px;
+            margin-bottom: 32px;
+            color: #6B6259;
+        }
+
+        .btn-wallet {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 52px;
+            background: #000;
+            color: #fff;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            transition: 0.2s;
+        }
+
+        .btn-wallet:hover {
+            transform: scale(0.98);
+        }
+
+        .btn-wallet img {
+            height: 20px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card" id="loader">
+        <p>Verifying magic link...</p>
+    </div>
+
+    <div class="card" id="content" style="display: none;">
+        <h1 id="name">Welcome back</h1>
+        <div id="tier-badge" class="badge">TIER</div>
+        <p class="scan-msg">Show this screen to your server</p>
+
+        <div class="discount-highlight" id="discount">0% OFF</div>
+
+        <!-- Apple Wallet Button -->
+        <a href="#" id="apple-wallet-btn" class="btn-wallet">
+            Add to Apple Wallet
+        </a>
+        <!-- Google Wallet Button (Stub for Phase 2 implementation) -->
+        <a href="#" class="btn-wallet" style="background:#1A73E8;" onclick="alert('Google Wallet integration stub')">
+            Add to Google Wallet
+        </a>
+
+        <div style="margin-top:24px; font-size: 13px; color: #6B6259;">
+            Total Spend (90d): <strong id="spend">£0.00</strong>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+
+            if (!token) {
+                document.getElementById('loader').innerHTML = '<p style="color:red">Invalid link. Please request a new one.</p>';
+                return;
+            }
+
+            try {
+                // For Phase 1 LocalStorage Demo, we will mock auth if the fetch fails by just looking up email
+                // Otherwise we will fetch from our backend
+                let data;
+                try {
+                    const res = await fetch(`/api/status`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error("API failed");
+                    data = await res.json();
+                } catch (err) {
+                    // Fallback to local storage (for demo if server not cleanly responding with token)
+                    // If we decode email from basic base64 (mock JWT)
+                    try {
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+                        const email = payload.email;
+                        const allData = App.getAllCustomers();
+                        const customer = allData.find(c => c.email === email);
+                        if (customer) {
+                            const settings = App.getSettings();
+                            const discount = App.tierDiscount(customer.current_tier, settings, false);
+                            data = { name: customer.name, tier: customer.current_tier, discount, spend90d: customer.spend_90d };
+                        } else throw new Error();
+                    } catch (e) {
+                        throw new Error("Invalid token format");
+                    }
+                }
+
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+
+                document.getElementById('name').innerText = data.name.split(' ')[0];
+                document.getElementById('tier-badge').innerText = App.tierLabel(data.tier);
+                document.getElementById('tier-badge').className = `badge badge-${data.tier}`;
+                document.getElementById('discount').innerText = `${data.discount}% OFF`;
+                document.getElementById('spend').innerText = `£${data.spend90d.toFixed(2)}`;
+
+                // Set the wallet endpoint
+                document.getElementById('apple-wallet-btn').href = `/api/wallet/apple?token=${token}`;
+
+            } catch (err) {
+                document.getElementById('loader').innerHTML = '<p style="color:red">Session expired or invalid link.</p>';
+            }
+        });
+    </script>
+</body>
+
+</html>
