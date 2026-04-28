@@ -120,6 +120,13 @@ const App = (() => {
             customer.currentTier = tier;
             saveData(data);
 
+            // Phase 2: Send to live backend to trigger emails and database
+            fetch('/api/visit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email: emailKey, spend })
+            }).catch(e => console.log('Backend sync skipped in local test'));
+
             const discount = tierDiscount(tier, settings, isNew);
 
             if (tierUp && !isNew) {
