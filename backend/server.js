@@ -278,8 +278,8 @@ app.post('/api/magic-link', async (req, res) => {
 
     const token = jwt.sign({ email: email.toLowerCase() }, JWT_SECRET, { expiresIn: '1h' });
     const s = await getSettings();
-    const link = https://restaurant-loyalty-trqr.onrender.com/wallet.html?token=${token}`;
-
+    const link = `https://restaurant-loyalty-trqr.onrender.com/wallet.html?token=${token}`;
+  
     if (process.env.SENDGRID_API_KEY && process.env.FROM_EMAIL) {
       await sgMail.send({
         to: email, from: process.env.FROM_EMAIL,
