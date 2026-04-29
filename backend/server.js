@@ -65,29 +65,127 @@ function checkAdmin(req, res, next) {
   next();
 }
 
-// Send email
-async function sendTierUpEmail(email, name, tier, discount, resName) {
-  if (!process.env.SENDGRID_API_KEY || !process.env.FROM_EMAIL) return;
-  try {
-    const msg = {
-      to: email,
-      from: process.env.FROM_EMAIL,
-      subject: `You've reached ${tierLabel(tier)} status at ${resName}!`,
-      html: `
-        <div style="background-color:#F7F3EE; padding:40px; font-family:sans-serif; color:#1A1410;">
-          <h2 style="color:#C4531A;">Congratulations ${name}!</h2>
-          <p>You have unlocked <strong>${tierLabel(tier)}</strong> status.</p>
-          <p>Enjoy your new discount of <strong>${discount}%</strong>.</p>
-          <p>Simply show the check-in screen to your server during your next visit.</p>
-          <hr style="border-top:1px solid rgba(26,20,16,0.12);" />
-          <footer style="font-size:12px; color:#6B6259;">${resName}</footer>
+// ====== Email Templates ======
+
+function emailWrapper(resName, bodyHtml, email) {
+  const unsubToken = jwt.sign({ email, action: 'unsubscribe' }, JWT_SECRET, { expiresIn: '30d' });
+  const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const unsubLink = `${baseUrl}/unsubscribe.html?token=${unsubToken}`;
+  return `
+    <div style="background-color:#F7F3EE; padding:0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; color:#1A1410;">
+      <div style="max-width:560px; margin:0 auto; padding:48px 32px;">
+        <div style="text-align:center; margin-bottom:32px;">
+          <h1 style="font-family:Georgia,'Times New Roman',serif; font-size:28px; font-weight:400; color:#1A1410; margin:0;">${resName}</h1>
+          <p style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#6B6259; margin:8px 0 0;">Loyalty Rewards</p>
         </div>
-      `,
-    };
-    await sgMail.send(msg);
-  } catch (err) {
-    console.error('Email error:', err);
+        <div style="background-color:#FFFFFF; border-radius:12px; padding:32px; border:1px solid rgba(26,20,16,0.08); box-shadow:0 2px 12px rgba(0,0,0,0.04);">
+          ${bodyHtml}
+        </div>
+        <div style="text-align:center; margin-top:32px;">
+          <p style="font-size:12px; color:#6B6259; margin:0;">Kind regards,</p>
+          <p style="font-size:13px; color:#1A1410; font-weight:500; margin:4px 0 0;">The team at ${resName}</p>
+          <hr style="border:none; border-top:1px solid rgba(26,20,16,0.08); margin:24px 0 16px;" />
+          <p style="font-size:11px; color:#9E9589; margin:0;">You're receiving this because you're a valued member of our loyalty programme.</p>
+          <p style="margin:8px 0 0;"><a href="${unsubLink}" style="font-size:11px; color:#9E9589; text-decoration:underline;">Unsubscribe from loyalty emails</a></p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function sendEmail(to, subject, bodyHtml, resName) {
+  if (!process.env.SENDGRID_API_KEY || !process.env.FROM_EMAIL) {
+    console.log(`[STUB EMAIL] To: ${to} | Subject: ${subject}`);
+    return;
   }
+  // Check if user has unsubscribed
+  try {
+    const check = await pool.query('SELECT unsubscribed FROM customers WHERE email = $1', [to.toLowerCase()]);
+    if (check.rows.length > 0 && check.rows[0].unsubscribed) {
+      console.log(`[EMAIL SKIPPED] ${to} is unsubscribed.`);
+      return;
+    }
+  } catch (e) { /* proceed if check fails */ }
+  try {
+    await sgMail.send({ to, from: process.env.FROM_EMAIL, subject, html: emailWrapper(resName, bodyHtml, to) });
+  } catch (err) {
+    console.error('Email error:', err.message);
+  }
+}
+
+async function sendWelcomeEmail(email, name, discount, resName) {
+  const subject = `Welcome to ${resName} Rewards!`;
+  const body = `
+    <h2 style="font-family:Georgia,serif; font-size:22px; color:#C4531A; margin:0 0 16px;">Welcome, ${name.split(' ')[0]}!</h2>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">Thank you so much for dining with us today — we hope you had a wonderful experience.</p>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">As a warm welcome to our loyalty family, here is your well-deserved reward:</p>
+    <div style="background:#FFF8E1; border:2px dashed #FFE082; border-radius:10px; padding:20px; text-align:center; margin:24px 0;">
+      <p style="font-size:32px; font-weight:600; color:#C4531A; margin:0;">${discount}% OFF</p>
+      <p style="font-size:13px; color:#6B6259; margin:8px 0 0;">Your new customer discount — show this to your server on your next visit</p>
+    </div>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">The more you dine, the more you save. Keep visiting and watch your tier climb from Bronze all the way to VIP!</p>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">We can't wait to welcome you back soon.</p>
+  `;
+  await sendEmail(email, subject, body, resName);
+}
+
+async function sendTierUpEmail(email, name, tier, discount, resName) {
+  const subject = `Congratulations — you've reached ${tierLabel(tier)} status!`;
+  const body = `
+    <h2 style="font-family:Georgia,serif; font-size:22px; color:#C4531A; margin:0 0 16px;">Brilliant news, ${name.split(' ')[0]}!</h2>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">We hope you enjoyed your visit today. Your loyalty has truly paid off — you've just unlocked a brand new tier!</p>
+    <div style="background:#1A1410; border-radius:10px; padding:24px; text-align:center; margin:24px 0;">
+      <p style="font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:#9E9589; margin:0 0 8px;">Your new status</p>
+      <p style="font-size:28px; font-weight:600; color:#C8A84B; margin:0;">${tierLabel(tier).toUpperCase()}</p>
+    </div>
+    <div style="background:#FFF8E1; border:2px dashed #FFE082; border-radius:10px; padding:20px; text-align:center; margin:0 0 24px;">
+      <p style="font-size:32px; font-weight:600; color:#C4531A; margin:0;">${discount}% OFF</p>
+      <p style="font-size:13px; color:#6B6259; margin:8px 0 0;">Here is your well-deserved discount — simply show this to your server</p>
+    </div>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">Thank you for being such a loyal guest. We truly appreciate every visit, and we look forward to seeing you again very soon.</p>
+  `;
+  await sendEmail(email, subject, body, resName);
+}
+
+async function sendReactivationEmail(email, name, tier, discount, resName) {
+  const subject = `We miss you, ${name.split(' ')[0]}!`;
+  const body = `
+    <h2 style="font-family:Georgia,serif; font-size:22px; color:#C4531A; margin:0 0 16px;">It's been a while, ${name.split(' ')[0]}!</h2>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">We've noticed it's been some time since your last visit, and honestly — we miss having you.</p>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">The good news? You still hold <strong>${tierLabel(tier)}</strong> status with us, and your exclusive discount is waiting:</p>
+    <div style="background:#FFF8E1; border:2px dashed #FFE082; border-radius:10px; padding:20px; text-align:center; margin:24px 0;">
+      <p style="font-size:32px; font-weight:600; color:#C4531A; margin:0;">${discount}% OFF</p>
+      <p style="font-size:13px; color:#6B6259; margin:8px 0 0;">Your ${tierLabel(tier)} reward is still active — don't let it go to waste!</p>
+    </div>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">Pop in any time and simply check in at the door. Your table is always ready.</p>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">We'd love to welcome you back.</p>
+  `;
+  await sendEmail(email, subject, body, resName);
+}
+
+async function sendMonthlyEmail(email, name, tier, spend90d, discount, resName) {
+  const monthName = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(new Date());
+  const subject = `Your ${monthName} Loyalty Update`;
+  const body = `
+    <h2 style="font-family:Georgia,serif; font-size:22px; color:#C4531A; margin:0 0 16px;">Your monthly update, ${name.split(' ')[0]}</h2>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">Here's a quick snapshot of where you stand this month. Thank you for continuing to dine with us!</p>
+    <div style="display:flex; gap:12px; margin:24px 0;">
+      <div style="flex:1; background:#F7F3EE; border-radius:10px; padding:16px; text-align:center;">
+        <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6B6259; margin:0 0 4px;">Current Tier</p>
+        <p style="font-size:20px; font-weight:600; color:#1A1410; margin:0;">${tierLabel(tier)}</p>
+      </div>
+      <div style="flex:1; background:#F7F3EE; border-radius:10px; padding:16px; text-align:center;">
+        <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#6B6259; margin:0 0 4px;">90-Day Spend</p>
+        <p style="font-size:20px; font-weight:600; color:#1A1410; margin:0;">&pound;${parseFloat(spend90d).toFixed(2)}</p>
+      </div>
+    </div>
+    <div style="background:#FFF8E1; border:2px dashed #FFE082; border-radius:10px; padding:20px; text-align:center; margin:0 0 24px;">
+      <p style="font-size:32px; font-weight:600; color:#C4531A; margin:0;">${discount}% OFF</p>
+      <p style="font-size:13px; color:#6B6259; margin:8px 0 0;">Your current active discount</p>
+    </div>
+    <p style="font-size:15px; line-height:1.6; color:#1A1410;">Keep dining with us to maintain or increase your tier. We genuinely appreciate your loyalty and look forward to your next visit!</p>
+  `;
+  await sendEmail(email, subject, body, resName);
 }
 
 app.post('/api/visit', async (req, res) => {
@@ -137,7 +235,7 @@ app.post('/api/visit', async (req, res) => {
     if (tierUp && !isNew) {
       sendTierUpEmail(email, name, newTier, discount, s.restaurant_name);
     } else if (isNew) {
-      sendTierUpEmail(email, name, 'none (Welcome!)', discount, s.restaurant_name);
+      sendWelcomeEmail(email, name, discount, s.restaurant_name);
     }
 
     const totalVisits = await pool.query('SELECT COUNT(*) as c FROM visits WHERE customer_id = $1', [customerId]);
@@ -279,7 +377,7 @@ app.post('/api/magic-link', async (req, res) => {
     const token = jwt.sign({ email: email.toLowerCase() }, JWT_SECRET, { expiresIn: '1h' });
     const s = await getSettings();
     const link = `https://restaurant-loyalty-trqr.onrender.com/wallet.html?token=${token}`;
-  
+
     if (process.env.SENDGRID_API_KEY && process.env.FROM_EMAIL) {
       await sgMail.send({
         to: email, from: process.env.FROM_EMAIL,
@@ -351,30 +449,85 @@ app.get('/api/wallet/apple', async (req, res) => {
 
 cron.schedule('0 12 * * *', async () => {
   try {
+    const s = await getSettings();
     const rs = await pool.query(`
-        SELECT c.email, c.name, MAX(v.visited_at) as last
+        SELECT c.email, c.name, c.current_tier, MAX(v.visited_at) as last
         FROM customers c JOIN visits v ON c.id = v.customer_id
         WHERE c.current_tier != 'none'
-        GROUP BY c.id HAVING MAX(v.visited_at) < NOW() - INTERVAL '60 days'
+        GROUP BY c.id, c.email, c.name, c.current_tier
+        HAVING MAX(v.visited_at) < NOW() - INTERVAL '60 days'
       `);
-    rs.rows.forEach(r => {
-      console.log(`[CRON] Reactivation Email pushed to ${r.email}: "We miss you!"`);
-    });
-  } catch (e) { }
+    for (const r of rs.rows) {
+      const discount = tierDiscount(r.current_tier, s, false);
+      await sendReactivationEmail(r.email, r.name, r.current_tier, discount, s.restaurant_name);
+    }
+    console.log(`[CRON] Sent ${rs.rowCount} reactivation emails.`);
+  } catch (e) { console.error('[CRON] Reactivation error:', e.message); }
 });
 
 cron.schedule('0 10 1 * *', async () => {
   try {
+    const s = await getSettings();
     const rs = await pool.query(`
-        SELECT c.email, c.name, c.current_tier, SUM(v.spend) as s90
-        FROM customers c JOIN visits v ON c.id = v.customer_id 
+        SELECT c.email, c.name, c.current_tier,
+          COALESCE(SUM(CASE WHEN v.visited_at >= NOW() - INTERVAL '90 days' THEN v.spend ELSE 0 END), 0) as s90
+        FROM customers c JOIN visits v ON c.id = v.customer_id
         WHERE v.visited_at >= NOW() - INTERVAL '90 days'
-        GROUP BY c.id
+        GROUP BY c.id, c.email, c.name, c.current_tier
       `);
-    rs.rows.forEach(r => {
-      console.log(`[CRON] Monthly Email pushed to ${r.email}: "Tier: ${r.current_tier}, 90d Spend: £${r.s90}"`);
-    });
-  } catch (e) { }
+    for (const r of rs.rows) {
+      const discount = tierDiscount(r.current_tier, s, false);
+      await sendMonthlyEmail(r.email, r.name, r.current_tier, r.s90, discount, s.restaurant_name);
+    }
+    console.log(`[CRON] Sent ${rs.rowCount} monthly status emails.`);
+  } catch (e) { console.error('[CRON] Monthly error:', e.message); }
+});
+
+// ====== Data Cleanup: Delete records older than 90 days ======
+cron.schedule('0 3 * * *', async () => {
+  try {
+    // Step 1: Delete visits older than 90 days
+    const deleted = await pool.query(
+      `DELETE FROM visits WHERE visited_at < NOW() - INTERVAL '90 days' RETURNING id`
+    );
+    console.log(`[CRON CLEANUP] Deleted ${deleted.rowCount} visits older than 90 days.`);
+
+    // Step 2: Remove customers who now have zero visits remaining
+    const orphaned = await pool.query(
+      `DELETE FROM customers WHERE id NOT IN (SELECT DISTINCT customer_id FROM visits) RETURNING email`
+    );
+    console.log(`[CRON CLEANUP] Removed ${orphaned.rowCount} inactive customers with no recent visits.`);
+  } catch (e) {
+    console.error('[CRON CLEANUP] Error:', e.message);
+  }
+});
+
+// ====== Unsubscribe Endpoints ======
+
+app.post('/api/unsubscribe', async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Missing token' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.action !== 'unsubscribe') return res.status(400).json({ error: 'Invalid token' });
+    await pool.query('UPDATE customers SET unsubscribed = TRUE WHERE email = $1', [payload.email]);
+    res.json({ success: true, email: payload.email });
+  } catch (err) {
+    res.status(400).json({ error: 'Invalid or expired link' });
+  }
+});
+
+app.post('/api/resubscribe', async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Missing token' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.action !== 'unsubscribe') return res.status(400).json({ error: 'Invalid token' });
+    await pool.query('UPDATE customers SET unsubscribed = FALSE WHERE email = $1', [payload.email]);
+    res.json({ success: true, email: payload.email });
+  } catch (err) {
+    res.status(400).json({ error: 'Invalid or expired link' });
+  }
 });
 
 const port = process.env.PORT || 3000;

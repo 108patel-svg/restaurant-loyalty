@@ -13,8 +13,14 @@ async function migrate() {
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         current_tier TEXT NOT NULL DEFAULT 'none',
+        unsubscribed BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+        // For existing databases: add the column if it doesn't exist yet
+        await pool.query(`
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN NOT NULL DEFAULT FALSE;
     `);
 
         await pool.query(`
