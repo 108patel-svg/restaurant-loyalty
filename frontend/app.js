@@ -13,6 +13,7 @@ const App = (() => {
         discount_silver: 15,
         discount_gold: 20,
         discount_vip: 25,
+        // SECURITY NOTE: In production, remove the PIN from frontend code entirely. Authentication must be handled by the backend only. The frontend should send the PIN to the server and receive a short-lived token in return.
         admin_pin: '1234'
     };
 
@@ -75,9 +76,9 @@ const App = (() => {
         console.log(`[EMAIL STUB] To: ${customer.email} | Subject: You've reached ${tierLabel(newTier)} status! | Discount: ${discount}%`);
     }
 
-    function submitVisit(name, email, spendStr) {
+    function submitVisit(name, email, spendStr, marketingConsent = false) {
         // Phase 1: LocalStorage
-        // Phase 2: fetch('/api/visit', { method: 'POST', body: JSON.stringify({ name, email, spend }) })
+        // Phase 2: fetch('/api/visit', { method: 'POST', body: JSON.stringify({ name, email, spend, marketing_consent: marketingConsent }) })
         return new Promise((resolve) => {
             const data = getData();
             const settings = getSettings();
@@ -92,10 +93,16 @@ const App = (() => {
                     email: emailKey,
                     visits: [],
                     firstVisit: Date.now(),
-                    currentTier: 'none'
+                    currentTier: 'none',
+                    marketingConsent: marketingConsent,
+                    consentDate: marketingConsent ? new Date().toISOString() : null
                 };
             } else {
                 data[emailKey].name = name;
+                if (marketingConsent && !data[emailKey].marketingConsent) {
+                    data[emailKey].marketingConsent = true;
+                    data[emailKey].consentDate = new Date().toISOString();
+                }
             }
 
             const customer = data[emailKey];
@@ -124,7 +131,7 @@ const App = (() => {
             fetch('/api/visit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email: emailKey, spend })
+                body: JSON.stringify({ name, email: emailKey, spend, marketing_consent: marketingConsent })
             }).catch(e => console.log('Backend sync skipped in local test'));
 
             const discount = tierDiscount(tier, settings, isNew);
@@ -179,7 +186,9 @@ const App = (() => {
                 created_at: c.firstVisit,
                 visit_count: c.visits.length,
                 spend_90d: s90d,
-                last_visit_ts: lastVisitTs
+                last_visit_ts: lastVisitTs,
+                marketing_consent: c.marketingConsent,
+                consent_date: c.consentDate
             });
         }
 

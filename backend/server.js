@@ -1,20 +1,33 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const sgMail = require('@sendgrid/mail');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const cron = require('node-cron');
-const { PKPass } = require('passkit-generator');
 
 const app = express();
-app.use(cors());
+
+// SECURITY HEADERS
+app.use(helmet());
+
+// CORS RESTRICTION
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
+}));
 app.use(express.json());
 
 // Serve static frontend
 app.use(express.static(path.join(__dirname, '../frontend')));
 
+/* 
+ * SECURITY NOTE: The DATABASE_URL must point to a private/internal database. 
+ * Never expose PostgreSQL port 5432 to the public internet. 
+ * Use environment variables only. Never hardcode credentials.
+ */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
@@ -55,6 +68,19 @@ function tierDiscount(tier, s, isNew) {
   if (tier === 'bronze') return Number(s.discount_bronze);
   return 0;
 }
+
+// ====== Rate Limiters ======
+const visitLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10,
+  message: { error: 'Too many requests. Please wait and try again.' }
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30,
+  message: { error: 'Too many requests. Please wait and try again.' }
+});
 
 // Admin Auth Middleware
 function checkAdmin(req, res, next) {
@@ -188,25 +214,47 @@ async function sendMonthlyEmail(email, name, tier, spend90d, discount, resName) 
   await sendEmail(email, subject, body, resName);
 }
 
-app.post('/api/visit', async (req, res) => {
-  const { name, email, spend } = req.body;
-  if (!name || !email || spend === undefined || spend < 0) {
+app.post('/api/visit', visitLimiter, async (req, res) => {
+  let { name, email, spend, marketing_consent } = req.body;
+  
+  if (typeof name !== 'string' || typeof email !== 'string') {
     return res.status(400).json({ error: 'Invalid fields' });
   }
+
+  name = name.trim();
+  email = email.trim().toLowerCase();
+
+  if (!name || !email || name.length > 500 || email.length > 500) {
+    return res.status(400).json({ error: 'Invalid fields' });
+  }
+
+  spend = parseFloat(spend);
+  if (isNaN(spend) || spend < 0 || spend > 99999) {
+    return res.status(400).json({ error: 'Invalid fields' });
+  }
+
+  marketing_consent = Boolean(marketing_consent);
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
 
   try {
     const s = await getSettings();
 
     // Check if new & Upsert customer
     const custRes = await pool.query(
-      `INSERT INTO customers (name, email) VALUES ($1, $2)
-       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, current_tier, created_at`,
-      [name, email.toLowerCase()]
+      `INSERT INTO customers (name, email, marketing_consent, consent_date, consent_ip) 
+       VALUES ($1, $2, $3, CASE WHEN $3 THEN NOW() ELSE NULL END, CASE WHEN $3 THEN $4 ELSE NULL END)
+       ON CONFLICT (email) DO UPDATE SET 
+         name = EXCLUDED.name,
+         marketing_consent = CASE WHEN EXCLUDED.marketing_consent THEN TRUE ELSE customers.marketing_consent END,
+         consent_date = CASE WHEN EXCLUDED.marketing_consent AND NOT customers.marketing_consent THEN NOW() ELSE customers.consent_date END,
+         consent_ip = CASE WHEN EXCLUDED.marketing_consent AND NOT customers.marketing_consent THEN $4 ELSE customers.consent_ip END
+       RETURNING id, current_tier, created_at, marketing_consent`,
+      [name, email, marketing_consent, clientIp]
     );
     const customer = custRes.rows[0];
     const customerId = customer.id;
     const prevTier = customer.current_tier;
+    const hasMarketingConsent = customer.marketing_consent;
 
     // Is new customer
     const visitsCheck = await pool.query('SELECT COUNT(*) FROM visits WHERE customer_id = $1', [customerId]);
@@ -233,7 +281,9 @@ app.post('/api/visit', async (req, res) => {
     const discount = tierDiscount(newTier, s, isNew);
 
     if (tierUp && !isNew) {
-      sendTierUpEmail(email, name, newTier, discount, s.restaurant_name);
+      if (hasMarketingConsent) {
+        sendTierUpEmail(email, name, newTier, discount, s.restaurant_name);
+      }
     } else if (isNew) {
       sendWelcomeEmail(email, name, discount, s.restaurant_name);
     }
@@ -259,7 +309,7 @@ app.post('/api/visit', async (req, res) => {
   }
 });
 
-app.get('/api/admin/stats', checkAdmin, async (req, res) => {
+app.get('/api/admin/stats', adminLimiter, checkAdmin, async (req, res) => {
   try {
     const cRes = await pool.query('SELECT COUNT(*) FROM customers');
     const todayRes = await pool.query(`SELECT COUNT(DISTINCT customer_id) FROM visits WHERE visited_at >= CURRENT_DATE`);
@@ -294,7 +344,7 @@ app.get('/api/admin/stats', checkAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/admin/customers', checkAdmin, async (req, res) => {
+app.get('/api/admin/customers', adminLimiter, checkAdmin, async (req, res) => {
   try {
     const s = req.query.search || '';
     const q = `
@@ -315,11 +365,11 @@ app.get('/api/admin/customers', checkAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/admin/settings', checkAdmin, async (req, res) => {
+app.get('/api/admin/settings', adminLimiter, checkAdmin, async (req, res) => {
   res.json(await getSettings());
 });
 
-app.put('/api/admin/settings', checkAdmin, async (req, res) => {
+app.put('/api/admin/settings', adminLimiter, checkAdmin, async (req, res) => {
   const b = req.body;
   try {
     await pool.query(`
@@ -337,7 +387,7 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/admin/export', checkAdmin, async (req, res) => {
+app.get('/api/admin/export', adminLimiter, checkAdmin, async (req, res) => {
   try {
     const q = `
       SELECT c.*, COUNT(v.id) as visit_count,
@@ -362,90 +412,7 @@ app.get('/api/admin/export', checkAdmin, async (req, res) => {
   }
 });
 
-// ====== Phase 2 Features ======
-
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
-
-app.post('/api/magic-link', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email required' });
-  try {
-    const custRes = await pool.query('SELECT name FROM customers WHERE email = $1', [email.toLowerCase()]);
-    if (custRes.rows.length === 0) return res.status(404).json({ error: 'Email not found' });
-    const name = custRes.rows[0].name;
-
-    const token = jwt.sign({ email: email.toLowerCase() }, JWT_SECRET, { expiresIn: '1h' });
-    const s = await getSettings();
-    const link = `https://restaurant-loyalty-trqr.onrender.com/wallet.html?token=${token}`;
-
-    if (process.env.SENDGRID_API_KEY && process.env.FROM_EMAIL) {
-      await sgMail.send({
-        to: email, from: process.env.FROM_EMAIL,
-        subject: `Your Secure Login Link - ${s.restaurant_name}`,
-        text: `Click here to open your wallet: ${link}`,
-        html: `<p>Hi ${name},</p><p><a href="${link}">Click here to view your digital loyalty card</a></p>`,
-      });
-    } else {
-      console.log(`[STUB EMAIL] To: ${email} | Subject: Magic Link | Link: ${link}`);
-    }
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
-
-app.get('/api/status', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Missing token' });
-  const token = authHeader.split(' ')[1];
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    const q = `
-      SELECT c.*, COALESCE(SUM(CASE WHEN v.visited_at >= NOW() - INTERVAL '90 days' THEN v.spend ELSE 0 END), 0) as spend_90d
-      FROM customers c LEFT JOIN visits v ON c.id = v.customer_id
-      WHERE c.email = $1 GROUP BY c.id
-    `;
-    const rs = await pool.query(q, [payload.email]);
-    if (rs.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-
-    const s = await getSettings();
-    const user = rs.rows[0];
-    const discount = tierDiscount(user.current_tier, s, false);
-
-    res.json({ name: user.name, tier: user.current_tier, spend90d: parseFloat(user.spend_90d), discount });
-  } catch (err) { res.status(401).json({ error: 'Invalid or expired token' }); }
-});
-
-app.get('/api/wallet/apple', async (req, res) => {
-  const token = req.query.token;
-  if (!token) return res.status(401).send('Missing token');
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    const rs = await pool.query('SELECT name, current_tier FROM customers WHERE email = $1', [payload.email]);
-    if (rs.rows.length === 0) return res.status(404).send('Not found');
-    const user = rs.rows[0];
-    const s = await getSettings();
-    const discount = tierDiscount(user.current_tier, s, false);
-
-    try {
-      const pass = new PKPass({
-        "passTypeIdentifier": "pass.com.example.restaurant",
-        "teamIdentifier": "TEAMID123",
-        "organizationName": s.restaurant_name,
-        "description": "Loyalty Pass"
-      }, { signerCert: Buffer.from([]), signerKey: Buffer.from([]), wwdr: Buffer.from([]) });
-
-      pass.primaryFields.push({ key: "name", label: "Name", value: user.name });
-      pass.secondaryFields.push({ key: "tier", label: "Tier", value: tierLabel(user.current_tier).toUpperCase() });
-      pass.backFields.push({ key: "discount", label: "Discount", value: `${discount}% OFF` });
-
-      const buffer = await pass.getAsBuffer();
-      res.type('application/vnd.apple.pkpass');
-      res.send(buffer);
-    } catch (certErr) {
-      res.type('text/plain');
-      res.send(`Mock Apple Wallet Pass created for ${user.name} - Tier: ${tierLabel(user.current_tier)}. (Requires valid Apple Certificates attached to passkit-generator to serve binary real pass).`);
-    }
-  } catch (err) { res.status(401).send('Invalid token'); }
-});
 
 cron.schedule('0 12 * * *', async () => {
   try {
@@ -453,7 +420,7 @@ cron.schedule('0 12 * * *', async () => {
     const rs = await pool.query(`
         SELECT c.email, c.name, c.current_tier, MAX(v.visited_at) as last
         FROM customers c JOIN visits v ON c.id = v.customer_id
-        WHERE c.current_tier != 'none'
+        WHERE c.current_tier != 'none' AND c.marketing_consent = TRUE
         GROUP BY c.id, c.email, c.name, c.current_tier
         HAVING MAX(v.visited_at) < NOW() - INTERVAL '60 days'
       `);
@@ -472,7 +439,7 @@ cron.schedule('0 10 1 * *', async () => {
         SELECT c.email, c.name, c.current_tier,
           COALESCE(SUM(CASE WHEN v.visited_at >= NOW() - INTERVAL '90 days' THEN v.spend ELSE 0 END), 0) as s90
         FROM customers c JOIN visits v ON c.id = v.customer_id
-        WHERE v.visited_at >= NOW() - INTERVAL '90 days'
+        WHERE v.visited_at >= NOW() - INTERVAL '90 days' AND c.marketing_consent = TRUE
         GROUP BY c.id, c.email, c.name, c.current_tier
       `);
     for (const r of rs.rows) {

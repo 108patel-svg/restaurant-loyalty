@@ -14,6 +14,9 @@ async function migrate() {
         email TEXT UNIQUE NOT NULL,
         current_tier TEXT NOT NULL DEFAULT 'none',
         unsubscribed BOOLEAN NOT NULL DEFAULT FALSE,
+        marketing_consent BOOLEAN NOT NULL DEFAULT FALSE,
+        consent_date TIMESTAMPTZ,
+        consent_ip TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
@@ -21,6 +24,9 @@ async function migrate() {
         // For existing databases: add the column if it doesn't exist yet
         await pool.query(`
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS consent_date TIMESTAMPTZ;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS consent_ip TEXT;
     `);
 
         await pool.query(`

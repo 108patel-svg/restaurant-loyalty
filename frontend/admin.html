@@ -539,6 +539,7 @@
                                 <th>Tier</th>
                                 <th>Visits</th>
                                 <th>90-Day Spend</th>
+                                <th>Marketing</th>
                                 <th>Member Since</th>
                             </tr>
                         </thead>
@@ -596,6 +597,23 @@
     <script src="app.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            let inactivityTimer;
+            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+            function resetInactivityTimer() {
+                clearTimeout(inactivityTimer);
+                if (document.getElementById("view-dashboard").style.display === "block") {
+                    inactivityTimer = setTimeout(() => {
+                        document.getElementById("btn-logout").click();
+                        App.setAlert("login-alert", "You have been logged out due to inactivity", "error");
+                    }, INACTIVITY_TIMEOUT);
+                }
+            }
+
+            ['click', 'touchstart', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
+                document.addEventListener(evt, resetInactivityTimer);
+            });
+
             document.getElementById("login-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 const pin = document.getElementById("pin-input").value;
@@ -603,6 +621,7 @@
                     document.getElementById("view-login").style.display = "none";
                     document.getElementById("view-dashboard").style.display = "block";
                     loadDashboard();
+                    resetInactivityTimer();
                 } else {
                     App.setAlert("login-alert", "Incorrect PIN", "error");
                     document.getElementById("pin-input").value = "";
@@ -702,6 +721,16 @@
 
                 tbody.innerHTML = customers.map(c => {
                     const d = new Date(c.created_at);
+                    
+                    let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
+                    if (c.marketing_consent) {
+                        const mDate = new Date(c.consent_date);
+                        marketingHtml = `
+                            <div style="color: #2E7D32; font-weight: 500; font-size: 13px;">✓ Opted in</div>
+                            <div style="font-size: 11px; color: var(--muted);">${new Intl.DateTimeFormat('en-GB').format(mDate)}</div>
+                        `;
+                    }
+
                     return `
                     <tr>
                         <td>
@@ -711,6 +740,7 @@
                         <td><span class="badge badge-${c.current_tier}">${App.tierLabel(c.current_tier)}</span></td>
                         <td>${c.visit_count}</td>
                         <td>£${c.spend_90d.toFixed(2)}</td>
+                        <td>${marketingHtml}</td>
                         <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
                     </tr>`;
                 }).join('');

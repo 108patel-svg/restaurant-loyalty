@@ -526,6 +526,20 @@
                         <div class="date-display" id="date-display"></div>
                     </div>
 
+                    <div class="form-group" style="margin-top: 24px; margin-bottom: 16px;">
+                        <label style="display: flex; align-items: flex-start; cursor: pointer; gap: 12px; font-weight: normal; margin: 0;">
+                            <input type="checkbox" id="marketing_consent" style="width: 20px; height: 20px; min-width: 20px; border-radius: 4px; accent-color: var(--ember); margin-top: 2px; cursor: pointer;">
+                            <div>
+                                <span style="font-size: 14px; font-weight: 500; color: var(--dark); display: block; margin-bottom: 4px;">I'd like to receive exclusive rewards, offers, and loyalty updates by email.</span>
+                                <span style="font-size: 12px; color: var(--muted); display: block; line-height: 1.4;">You can unsubscribe at any time. We will never share your email with third parties.</span>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <div style="margin-bottom: 24px; text-align: center;">
+                        <span style="font-size: 12px; color: var(--muted);">By submitting this form, you agree to our <a href="terms.html" target="_blank" style="color: var(--ember); text-decoration: underline;">Terms & Conditions and Privacy Policy</a>.</span>
+                    </div>
+
                     <button type="submit" class="primary" id="submit-btn" style="margin-top: 8px;">Check In</button>
                 </form>
             </div>
@@ -659,9 +673,10 @@
                 if (!spend || isNaN(spend) || parseFloat(spend) < 0) return App.setAlert("form-alert", "Spend must be a valid number >= 0", "error");
 
                 document.getElementById("submit-btn").disabled = true;
+                const marketingConsent = document.getElementById("marketing_consent").checked;
 
                 try {
-                    const result = await App.submitVisit(name, email, parseFloat(spend).toFixed(2));
+                    const result = await App.submitVisit(name, email, parseFloat(spend).toFixed(2), marketingConsent);
 
                     document.getElementById("result-name").innerText = name;
 
