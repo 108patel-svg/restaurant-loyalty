@@ -82,6 +82,18 @@ function tierDiscount(tier, s, isNew) {
   return 0;
 }
 
+async function recalculateTier(customerId, s) {
+    const sRes = await pool.query(
+      `SELECT SUM(spend) as total FROM visits
+       WHERE customer_id = $1 AND visited_at >= NOW() - INTERVAL '90 days'`,
+      [customerId]
+    );
+    const spend90d = parseFloat(sRes.rows[0].total) || 0;
+    const newTier = getTier(spend90d, s);
+    await pool.query('UPDATE customers SET current_tier = $1 WHERE id = $2', [newTier, customerId]);
+    return { spend90d, newTier };
+}
+
 // ====== Rate Limiters ======
 const visitLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
@@ -334,7 +346,7 @@ app.get('/api/admin/stats', adminLimiter, checkAdmin, async (req, res) => {
     tierCounts.rows.forEach(r => t[r.current_tier] = parseInt(r.count));
 
     const recent = await pool.query(`
-      SELECT c.name, v.visited_at, c.current_tier, v.spend
+      SELECT v.id, c.name, v.visited_at, c.current_tier, v.spend
       FROM visits v JOIN customers c ON v.customer_id = c.id
       ORDER BY v.visited_at DESC LIMIT 20
     `);
@@ -346,6 +358,7 @@ app.get('/api/admin/stats', adminLimiter, checkAdmin, async (req, res) => {
       revenue90d: parseFloat(revRes.rows[0].sum) || 0,
       tierCounts: t,
       recentVisits: recent.rows.map(r => ({
+        id: r.id,
         customerName: r.name,
         date: new Intl.DateTimeFormat('en-GB').format(r.visited_at),
         tier: r.current_tier,
@@ -422,6 +435,50 @@ app.get('/api/admin/export', adminLimiter, checkAdmin, async (req, res) => {
     res.send(csv);
   } catch (err) {
     res.status(500).json({ error: 'Export error' });
+  }
+});
+
+app.delete('/api/admin/customers/:email', adminLimiter, checkAdmin, async (req, res) => {
+  try {
+    const email = req.params.email.toLowerCase();
+    await pool.query('DELETE FROM customers WHERE email = $1', [email]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
+app.delete('/api/admin/visits/:id', adminLimiter, checkAdmin, async (req, res) => {
+  try {
+    const visitId = parseInt(req.params.id);
+    const vRes = await pool.query('DELETE FROM visits WHERE id = $1 RETURNING customer_id', [visitId]);
+    if (vRes.rowCount > 0) {
+      const s = await getSettings();
+      await recalculateTier(vRes.rows[0].customer_id, s);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete visit' });
+  }
+});
+
+app.put('/api/admin/visits/:id/spend', adminLimiter, checkAdmin, async (req, res) => {
+  try {
+    const visitId = parseInt(req.params.id);
+    const { spend } = req.body;
+    if (typeof spend !== 'number') return res.status(400).json({ error: 'Invalid spend' });
+
+    const vRes = await pool.query('UPDATE visits SET spend = $1 WHERE id = $2 RETURNING customer_id', [spend, visitId]);
+    if (vRes.rowCount > 0) {
+      const s = await getSettings();
+      await recalculateTier(vRes.rows[0].customer_id, s);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update visit' });
   }
 });
 

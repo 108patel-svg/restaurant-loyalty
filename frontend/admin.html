@@ -541,6 +541,7 @@
                                 <th>90-Day Spend</th>
                                 <th>Marketing</th>
                                 <th>Member Since</th>
+                                <th style="width: 100px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="customers-tbody">
@@ -754,6 +755,11 @@
                             <td>£${c.spend_90d.toFixed(2)}</td>
                             <td>${marketingHtml}</td>
                             <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
+                            <td>
+                                <button class="btn-delete" onclick="window.handleDeleteCustomer('${c.email}')" title="Delete Customer">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                </button>
+                            </td>
                         </tr>`;
                     }).join('');
                 } catch (e) {
@@ -777,6 +783,14 @@
                         <div class="list-right">
                             <div class="spend">£${parseFloat(v.spend).toFixed(2)}</div>
                             <div class="badge badge-${v.tier}">${App.tierLabel(v.tier)}</div>
+                            <div class="actions" style="display: flex; gap: 8px; margin-left: 12px;">
+                                <button class="btn-icon" onclick="window.handleEditVisit(${v.id}, ${v.spend})" title="Edit Spend">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button class="btn-icon" style="color: #B3261E;" onclick="window.handleDeleteVisit(${v.id})" title="Delete Record">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `).join('');
@@ -787,6 +801,34 @@
                 if (str) e.innerText = str;
                 return e.innerHTML;
             }
+
+            // Global Handlers for Admin Actions
+            window.handleDeleteCustomer = async (email) => {
+                if (!confirm(`Delete all records for ${email}? This cannot be undone.`)) return;
+                try {
+                    await App.deleteCustomer(email);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+
+            window.handleDeleteVisit = async (id) => {
+                if (!confirm(`Delete this visit record?`)) return;
+                try {
+                    await App.deleteVisit(id);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+
+            window.handleEditVisit = async (id, currentSpend) => {
+                const val = prompt("Enter new spend amount (£):", currentSpend);
+                if (val === null || val === "") return;
+                const spend = parseFloat(val);
+                if (isNaN(spend) || spend < 0) return alert("Invalid amount");
+                try {
+                    await App.editVisitSpend(id, spend);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
         });
     </script>
 </body>

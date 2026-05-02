@@ -289,6 +289,37 @@ const App = (() => {
         if (f) f.reset();
     }
 
+    async function deleteCustomer(email) {
+        const res = await fetch(`/api/admin/customers/${encodeURIComponent(email)}`, {
+            method: 'DELETE',
+            headers: { 'x-admin-pin': getSettings().admin_pin }
+        });
+        if (!res.ok) throw new Error('Failed to delete customer');
+        return await res.json();
+    }
+
+    async function deleteVisit(id) {
+        const res = await fetch(`/api/admin/visits/${id}`, {
+            method: 'DELETE',
+            headers: { 'x-admin-pin': getSettings().admin_pin }
+        });
+        if (!res.ok) throw new Error('Failed to delete visit');
+        return await res.json();
+    }
+
+    async function editVisitSpend(id, spend) {
+        const res = await fetch(`/api/admin/visits/${id}/spend`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-admin-pin': getSettings().admin_pin 
+            },
+            body: JSON.stringify({ spend })
+        });
+        if (!res.ok) throw new Error('Failed to update spend');
+        return await res.json();
+    }
+
     return {
         getSettings,
         saveSettingsData,
@@ -304,6 +335,9 @@ const App = (() => {
         spend90d,
         showView,
         setAlert,
-        resetForm
+        resetForm,
+        deleteCustomer,
+        deleteVisit,
+        editVisitSpend
     };
 })();
