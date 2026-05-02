@@ -163,96 +163,79 @@ const App = (() => {
         });
     }
 
-    function getAllCustomers(searchString = '') {
-        const data = getData();
-        const result = [];
-
-        for (const key in data) {
-            const c = data[key];
-            const s90d = spend90d(c.visits);
-
-            if (searchString) {
-                const q = searchString.toLowerCase();
-                if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) continue;
-            }
-
-            const lastVisitTs = c.visits.length > 0 ? c.visits[c.visits.length - 1].ts : 0;
-
-            result.push({
-                id: key,
-                name: c.name,
-                email: c.email,
-                current_tier: c.currentTier,
-                created_at: c.firstVisit,
-                visit_count: c.visits.length,
-                spend_90d: s90d,
-                last_visit_ts: lastVisitTs,
-                marketing_consent: c.marketingConsent,
-                consent_date: c.consentDate
+    async function getAllCustomers(searchString = '') {
+        try {
+            const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(searchString)}`, {
+                headers: { 'x-admin-pin': getSettings().admin_pin }
             });
+            if (!res.ok) throw new Error('Failed to fetch customers');
+            const customers = await res.json();
+            return customers.map(c => ({
+                ...c,
+                spend_90d: parseFloat(c.spend_90d) || 0,
+                visit_count: parseInt(c.visit_count) || 0
+            }));
+        } catch (e) {
+            console.error('Backend fetch failed, falling back to local', e);
+            // Fallback to local for dev/testing
+            const data = getData();
+            const result = [];
+            for (const key in data) {
+                const c = data[key];
+                const s90d = spend90d(c.visits);
+                if (searchString) {
+                    const q = searchString.toLowerCase();
+                    if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) continue;
+                }
+                result.push({
+                    id: key,
+                    name: c.name,
+                    email: c.email,
+                    current_tier: c.currentTier,
+                    created_at: c.firstVisit,
+                    visit_count: c.visits.length,
+                    spend_90d: s90d,
+                    last_visit_ts: c.visits.length > 0 ? c.visits[c.visits.length - 1].ts : 0,
+                    marketing_consent: c.marketingConsent,
+                    consent_date: c.consentDate
+                });
+            }
+            return result.sort((a, b) => b.last_visit_ts - a.last_visit_ts);
         }
-
-        result.sort((a, b) => b.last_visit_ts - a.last_visit_ts);
-        return result;
     }
 
-    function getAdminStats() {
-        const data = getData();
-        let totalCustomers = 0;
-        let visitedToday = 0;
-        let active90d = 0;
-        let revenue90d = 0;
-
-        const tierCounts = { none: 0, bronze: 0, silver: 0, gold: 0, vip: 0 };
-        let allVisits = [];
-
-        const now = Date.now();
-        const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
-
-        const isToday = (ts) => {
-            const d1 = new Date(ts);
-            const d2 = new Date();
-            return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-        };
-
-        for (const key in data) {
-            const c = data[key];
-            totalCustomers++;
-            tierCounts[c.currentTier]++;
-
-            let hasActive90d = false;
-
-            c.visits.forEach(v => {
-                allVisits.push({
-                    customerName: c.name,
-                    ts: v.ts,
-                    date: v.date,
-                    tier: c.currentTier,
-                    spend: v.spend
-                });
-
-                if (isToday(v.ts)) {
-                    visitedToday++;
-                }
-                if (now - v.ts <= ninetyDaysMs) {
-                    hasActive90d = true;
-                    revenue90d += Number(v.spend);
-                }
+    async function getAdminStats() {
+        try {
+            const res = await fetch('/api/admin/stats', {
+                headers: { 'x-admin-pin': getSettings().admin_pin }
             });
+            if (!res.ok) throw new Error('Failed to fetch stats');
+            return await res.json();
+        } catch (e) {
+            console.error('Backend stats failed, falling back to local', e);
+            const data = getData();
+            let totalCustomers = 0, visitedToday = 0, active90d = 0, revenue90d = 0;
+            const tierCounts = { none: 0, bronze: 0, silver: 0, gold: 0, vip: 0 };
+            let allVisits = [];
+            const now = Date.now();
+            const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+            const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
 
-            if (hasActive90d) active90d++;
+            for (const key in data) {
+                const c = data[key];
+                totalCustomers++;
+                tierCounts[c.currentTier]++;
+                let hasActive90d = false;
+                c.visits.forEach(v => {
+                    allVisits.push({ customerName: c.name, ts: v.ts, date: v.date, tier: c.currentTier, spend: v.spend });
+                    if (isToday(v.ts)) visitedToday++;
+                    if (now - v.ts <= ninetyDaysMs) { hasActive90d = true; revenue90d += Number(v.spend); }
+                });
+                if (hasActive90d) active90d++;
+            }
+            allVisits.sort((a, b) => b.ts - a.ts);
+            return { totalCustomers, visitedToday, active90d, revenue90d, tierCounts, recentVisits: allVisits.slice(0, 20) };
         }
-
-        allVisits.sort((a, b) => b.ts - a.ts);
-
-        return {
-            totalCustomers,
-            visitedToday,
-            active90d,
-            revenue90d,
-            tierCounts,
-            recentVisits: allVisits.slice(0, 20)
-        };
     }
 
     function checkAdminPin(pin) {

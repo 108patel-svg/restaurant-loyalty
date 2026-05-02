@@ -615,16 +615,22 @@
             });
 
             document.getElementById("login-form").addEventListener("submit", async (e) => {
-                e.preventDefault();
-                const pin = document.getElementById("pin-input").value;
-                if (App.checkAdminPin(pin)) {
-                    document.getElementById("view-login").style.display = "none";
-                    document.getElementById("view-dashboard").style.display = "block";
-                    await loadDashboard();
-                    resetInactivityTimer();
-                } else {
-                    App.setAlert("login-alert", "Incorrect PIN", "error");
-                    document.getElementById("pin-input").value = "";
+                e.preventDefault(); // Always prevent default at the very start
+                try {
+                    const pinInput = document.getElementById("pin-input");
+                    const pin = pinInput.value;
+                    if (App.checkAdminPin(pin)) {
+                        document.getElementById("view-login").style.display = "none";
+                        document.getElementById("view-dashboard").style.display = "block";
+                        await loadDashboard();
+                        resetInactivityTimer();
+                    } else {
+                        App.setAlert("login-alert", "Incorrect PIN", "error");
+                        pinInput.value = "";
+                    }
+                } catch (err) {
+                    console.error("Login submission error:", err);
+                    App.setAlert("login-alert", "System error. Please try again.", "error");
                 }
             });
 
