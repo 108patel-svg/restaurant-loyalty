@@ -614,13 +614,13 @@
                 document.addEventListener(evt, resetInactivityTimer);
             });
 
-            document.getElementById("login-form").addEventListener("submit", (e) => {
+            document.getElementById("login-form").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const pin = document.getElementById("pin-input").value;
                 if (App.checkAdminPin(pin)) {
                     document.getElementById("view-login").style.display = "none";
                     document.getElementById("view-dashboard").style.display = "block";
-                    loadDashboard();
+                    await loadDashboard();
                     resetInactivityTimer();
                 } else {
                     App.setAlert("login-alert", "Incorrect PIN", "error");
@@ -649,8 +649,8 @@
                 App.exportCSV();
             });
 
-            document.getElementById("search-input").addEventListener("input", () => {
-                renderCustomers();
+            document.getElementById("search-input").addEventListener("input", async () => {
+                await renderCustomers();
             });
 
             document.getElementById("btn-save-settings").addEventListener("click", () => {
@@ -678,72 +678,81 @@
                 document.getElementById("set-pin").value = "";
             });
 
-            function loadDashboard() {
-                const s = App.getSettings();
-                document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
+            async function loadDashboard() {
+                try {
+                    const s = App.getSettings();
+                    document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
 
-                document.getElementById("set-name").value = s.restaurant_name;
-                document.getElementById("set-t-bronze").value = s.bronze_threshold;
-                document.getElementById("set-t-silver").value = s.silver_threshold;
-                document.getElementById("set-t-gold").value = s.gold_threshold;
-                document.getElementById("set-t-vip").value = s.vip_threshold;
-                document.getElementById("set-d-new").value = s.discount_new;
-                document.getElementById("set-d-bronze").value = s.discount_bronze;
-                document.getElementById("set-d-silver").value = s.discount_silver;
-                document.getElementById("set-d-gold").value = s.discount_gold;
-                document.getElementById("set-d-vip").value = s.discount_vip;
+                    document.getElementById("set-name").value = s.restaurant_name;
+                    document.getElementById("set-t-bronze").value = s.bronze_threshold;
+                    document.getElementById("set-t-silver").value = s.silver_threshold;
+                    document.getElementById("set-t-gold").value = s.gold_threshold;
+                    document.getElementById("set-t-vip").value = s.vip_threshold;
+                    document.getElementById("set-d-new").value = s.discount_new;
+                    document.getElementById("set-d-bronze").value = s.discount_bronze;
+                    document.getElementById("set-d-silver").value = s.discount_silver;
+                    document.getElementById("set-d-gold").value = s.discount_gold;
+                    document.getElementById("set-d-vip").value = s.discount_vip;
 
-                const stats = App.getAdminStats();
-                document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
-                document.getElementById("stat-today-cust").innerText = stats.visitedToday;
-                document.getElementById("stat-active").innerText = stats.active90d;
-                document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
+                    const stats = await App.getAdminStats();
+                    document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
+                    document.getElementById("stat-today-cust").innerText = stats.visitedToday;
+                    document.getElementById("stat-active").innerText = stats.active90d;
+                    document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
 
-                document.getElementById("count-vip").innerText = stats.tierCounts.vip;
-                document.getElementById("count-gold").innerText = stats.tierCounts.gold;
-                document.getElementById("count-silver").innerText = stats.tierCounts.silver;
-                document.getElementById("count-bronze").innerText = stats.tierCounts.bronze;
-                document.getElementById("count-none").innerText = stats.tierCounts.none;
+                    document.getElementById("count-vip").innerText = stats.tierCounts.vip;
+                    document.getElementById("count-gold").innerText = stats.tierCounts.gold;
+                    document.getElementById("count-silver").innerText = stats.tierCounts.silver;
+                    document.getElementById("count-bronze").innerText = stats.tierCounts.bronze;
+                    document.getElementById("count-none").innerText = stats.tierCounts.none;
 
-                renderActivity(stats.recentVisits);
-                renderCustomers();
+                    renderActivity(stats.recentVisits);
+                    await renderCustomers();
+                } catch (e) {
+                    console.error(e);
+                    App.setAlert("dashboard-alert", "Error loading data. Check connection.", "error");
+                }
             }
 
-            function renderCustomers() {
-                const query = document.getElementById("search-input").value;
-                const customers = App.getAllCustomers(query);
-                const tbody = document.getElementById("customers-tbody");
+            async function renderCustomers() {
+                try {
+                    const query = document.getElementById("search-input").value;
+                    const customers = await App.getAllCustomers(query);
+                    const tbody = document.getElementById("customers-tbody");
 
-                if (customers.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--muted);">No customers found</td></tr>`;
-                    return;
-                }
-
-                tbody.innerHTML = customers.map(c => {
-                    const d = new Date(c.created_at);
-                    
-                    let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
-                    if (c.marketing_consent) {
-                        const mDate = new Date(c.consent_date);
-                        marketingHtml = `
-                            <div style="color: #2E7D32; font-weight: 500; font-size: 13px;">✓ Opted in</div>
-                            <div style="font-size: 11px; color: var(--muted);">${new Intl.DateTimeFormat('en-GB').format(mDate)}</div>
-                        `;
+                    if (customers.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--muted);">No customers found</td></tr>`;
+                        return;
                     }
 
-                    return `
-                    <tr>
-                        <td>
-                            <div class="customer-name">${escapeHTML(c.name)}</div>
-                            <div class="customer-email">${escapeHTML(c.email)}</div>
-                        </td>
-                        <td><span class="badge badge-${c.current_tier}">${App.tierLabel(c.current_tier)}</span></td>
-                        <td>${c.visit_count}</td>
-                        <td>£${c.spend_90d.toFixed(2)}</td>
-                        <td>${marketingHtml}</td>
-                        <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
-                    </tr>`;
-                }).join('');
+                    tbody.innerHTML = customers.map(c => {
+                        const d = new Date(c.created_at);
+                        
+                        let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
+                        if (c.marketing_consent) {
+                            const mDate = new Date(c.consent_date);
+                            marketingHtml = `
+                                <div style="color: #2E7D32; font-weight: 500; font-size: 13px;">✓ Opted in</div>
+                                <div style="font-size: 11px; color: var(--muted);">${new Intl.DateTimeFormat('en-GB').format(mDate)}</div>
+                            `;
+                        }
+
+                        return `
+                        <tr>
+                            <td>
+                                <div class="customer-name">${escapeHTML(c.name)}</div>
+                                <div class="customer-email">${escapeHTML(c.email)}</div>
+                            </td>
+                            <td><span class="badge badge-${c.current_tier}">${App.tierLabel(c.current_tier)}</span></td>
+                            <td>${c.visit_count}</td>
+                            <td>£${c.spend_90d.toFixed(2)}</td>
+                            <td>${marketingHtml}</td>
+                            <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
+                        </tr>`;
+                    }).join('');
+                } catch (e) {
+                    console.error(e);
+                }
             }
 
             function renderActivity(visits) {

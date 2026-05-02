@@ -11,6 +11,9 @@ const cron = require('node-cron');
 
 const app = express();
 
+// TRUST PROXY (Required for rate limiting to work on Render/load balancers)
+app.set('trust proxy', 1);
+
 // SECURITY HEADERS
 app.use(helmet());
 
