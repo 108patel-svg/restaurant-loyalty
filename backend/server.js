@@ -62,8 +62,26 @@ const statusLimiter = rateLimit({
 
 // HELPERS
 async function getSettings() {
-  const s = await get('SELECT * FROM settings LIMIT 1');
-  return s || {};
+  try {
+    const s = await get('SELECT * FROM settings LIMIT 1');
+    if (s) return s;
+  } catch (e) {
+    console.error('[DB] Settings table error:', e.message);
+  }
+  // Return hardcoded defaults if DB fails or is empty
+  return {
+    restaurant_name: 'The Restaurant',
+    admin_pin: '1234',
+    discount_new: 10,
+    discount_bronze: 10,
+    discount_silver: 15,
+    discount_gold: 20,
+    discount_vip: 25,
+    bronze_threshold: 300,
+    silver_threshold: 600,
+    gold_threshold: 1000,
+    vip_threshold: 2000
+  };
 }
 
 async function auditLog(action, details = '') {
@@ -151,14 +169,19 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
     auditLog('customer_checkin', `${name} (${email})`);
     const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email]);
     
+    // Check if customer already existed or is brand new
+    const checkNew = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
+    const isFirstVisit = checkNew.count === 0;
+
     if (spend > 0) {
       await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, spend]);
     }
 
     const { newTier } = await recalculateTier(customer.id, s);
-    const discount = tierDiscount(newTier, s, false);
+    // Apply Welcome Discount if it's their first time
+    const discount = tierDiscount(newTier, s, isFirstVisit);
 
-    auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}`);
+    auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}, New: ${isFirstVisit}`);
     res.json({ success: true, name: customer.name, tier: newTier, discount });
   } catch (err) {
     console.error(err);
