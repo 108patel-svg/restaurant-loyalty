@@ -628,6 +628,18 @@
                         <div class="form-row"><label>Gold</label><input type="number" id="set-d-gold"></div>
                         <div class="form-row"><label>VIP</label><input type="number" id="set-d-vip"></div>
 
+                        <h3 style="margin-top: 32px;">Bonus Rewards</h3>
+                        <div style="background: rgba(196, 83, 26, 0.03); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                            <p style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--ember);">1. Retention Bonus</p>
+                            <div class="form-row"><label>Return within (days)</label><input type="number" id="set-r-days"></div>
+                            <div class="form-row"><label>Reward Discount (%)</label><input type="number" id="set-r-disc"></div>
+                            
+                            <p style="font-size: 13px; font-weight: 600; margin: 16px 0 12px; color: var(--ember);">2. Frequency Bonus</p>
+                            <div class="form-row"><label>Visit count</label><input type="number" id="set-f-count"></div>
+                            <div class="form-row"><label>Within (days)</label><input type="number" id="set-f-days"></div>
+                            <div class="form-row"><label>Reward Discount (%)</label><input type="number" id="set-f-disc"></div>
+                        </div>
+
                         <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
                     </div>
                 </div>
@@ -721,6 +733,12 @@
                 s.discount_gold = Number(document.getElementById("set-d-gold").value);
                 s.discount_vip = Number(document.getElementById("set-d-vip").value);
 
+                s.retentionDays = Number(document.getElementById("set-r-days").value);
+                s.retentionDiscount = Number(document.getElementById("set-r-disc").value);
+                s.frequencyVisits = Number(document.getElementById("set-f-count").value);
+                s.frequencyDays = Number(document.getElementById("set-f-days").value);
+                s.frequencyDiscount = Number(document.getElementById("set-f-disc").value);
+
                 try {
                     await App.saveSettingsData(s);
                     App.setAlert("settings-alert", "Settings saved successfully", "success");
@@ -748,6 +766,12 @@
                     document.getElementById("set-d-silver").value = s.discount_silver;
                     document.getElementById("set-d-gold").value = s.discount_gold;
                     document.getElementById("set-d-vip").value = s.discount_vip;
+
+                    document.getElementById("set-r-days").value = s.retention_days;
+                    document.getElementById("set-r-disc").value = s.retention_discount;
+                    document.getElementById("set-f-count").value = s.frequency_visits;
+                    document.getElementById("set-f-days").value = s.frequency_days;
+                    document.getElementById("set-f-disc").value = s.frequency_discount;
 
                     const stats = await App.getAdminStats();
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
@@ -827,7 +851,7 @@
                     }
                     tbody.innerHTML = logs.map(l => `
                         <tr>
-                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${new Date(l.performed_at).toLocaleString('en-GB')}</td>
+                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${new Date(l.performed_at + 'Z').toLocaleString('en-GB')}</td>
                             <td style="font-weight: 500;">${escapeHTML(l.action)}</td>
                             <td>${escapeHTML(l.details)}</td>
                         </tr>
@@ -851,6 +875,14 @@
                         <div class="list-right">
                             <div class="spend">£${parseFloat(v.spend).toFixed(2)}</div>
                             <div class="badge badge-${v.tier}">${App.tierLabel(v.tier)}</div>
+                            <div class="actions" style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;">
+                                <button class="btn-icon" onclick="window.handleEditVisit(${v.id}, ${v.spend})" title="Edit Spend" style="background:none; border:none; color:var(--muted); cursor:pointer;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button class="btn-icon" onclick="window.handleDeleteVisit(${v.id})" title="Delete Record" style="background:none; border:none; color:#B3261E; cursor:pointer;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `).join('');
@@ -866,6 +898,25 @@
                 if (!confirm(`Delete all records for ${email}? This cannot be undone.`)) return;
                 try {
                     await App.deleteCustomer(email);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+
+            window.handleDeleteVisit = async (id) => {
+                if (!confirm(`Delete this visit record?`)) return;
+                try {
+                    await App.deleteVisit(id);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+
+            window.handleEditVisit = async (id, currentSpend) => {
+                const val = prompt("Enter new spend amount (£):", currentSpend);
+                if (val === null || val === "") return;
+                const spend = parseFloat(val);
+                if (isNaN(spend) || spend < 0) return alert("Invalid amount");
+                try {
+                    await App.editVisitSpend(id, spend);
                     await loadDashboard();
                 } catch (e) { alert(e.message); }
             };

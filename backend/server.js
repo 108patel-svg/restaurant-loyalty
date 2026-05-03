@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const path = require('path');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -10,37 +11,78 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Render Proxy Trust (Fixes rate-limit warning)
-app.set('trust proxy', 1);
-
 // DB Setup
-const dbPath = path.join(__dirname, 'loyalty.db');
-const db = new sqlite3.Database(dbPath);
+const isProd = !!process.env.DATABASE_URL;
+let db;
 
-const run = (sql, params = []) => new Promise((resolve, reject) => {
-  db.run(sql, params, function(err) {
-    if (err) reject(err);
-    else resolve(this);
+if (isProd) {
+  db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
   });
-});
+} else {
+  const dbPath = path.join(__dirname, 'loyalty.db');
+  db = new sqlite3.Database(dbPath);
+}
 
-const get = (sql, params = []) => new Promise((resolve, reject) => {
-  db.get(sql, params, (err, row) => {
-    if (err) reject(err);
-    else resolve(row);
+const run = (sql, params = []) => {
+  if (isProd) {
+    let i = 1;
+    const pSql = sql.replace(/\?/g, () => `$${i++}`);
+    return db.query(pSql, params);
+  }
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this);
+    });
   });
-});
+};
 
-const query = (sql, params = []) => new Promise((resolve, reject) => {
-  db.all(sql, params, (err, rows) => {
-    if (err) reject(err);
-    else resolve(rows);
+const get = (sql, params = []) => {
+  if (isProd) {
+    let i = 1;
+    const pSql = sql.replace(/\?/g, () => `$${i++}`);
+    return db.query(pSql, params).then(res => res.rows[0]);
+  }
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
   });
-});
+};
+
+const query = (sql, params = []) => {
+  if (isProd) {
+    let i = 1;
+    const pSql = sql.replace(/\?/g, () => `$${i++}`);
+    return db.query(pSql, params).then(res => res.rows);
+  }
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+};
+
+const NOW = isProd ? "CURRENT_TIMESTAMP" : "DATETIME('now')";
+const DAYS_90_AGO = isProd ? "CURRENT_TIMESTAMP - INTERVAL '90 days'" : "DATETIME('now', '-90 days')";
+const TODAY = isProd ? "CURRENT_DATE" : "DATE('now')";
 
 // Middleware
 app.use(express.json());
 app.use(cors());
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: *.jpg *.png *.webp; frame-src https://www.google.com"
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
 
 // Serve static files from both sites
 // The backend folder is inside the project root, so we go up one level to reach the frontend folders
@@ -63,71 +105,29 @@ const statusLimiter = rateLimit({
   message: { found: false, error: "Too many checks. Please try later." }
 });
 
-// Emails
-async function sendEmail(to, subject, text, html) {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.FROM_EMAIL || process.env.RESTAURANT_EMAIL;
-  
-  console.log(`[EMAIL] Attempting to send to ${to}. (Using Sender: ${fromEmail || 'MISSING'})`);
-
-  if (!apiKey || !fromEmail) {
-    console.error('[EMAIL] CRITICAL: Missing SENDGRID_API_KEY or RESTAURANT_EMAIL in environment variables.');
-    return;
-  }
-
-  try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: fromEmail },
-        subject: subject,
-        content: [
-          { type: 'text/plain', value: text + '\n\nUnsubscribe: ' + (process.env.PUBLIC_URL || 'http://localhost:3000') + '/public/' },
-          { 
-            type: 'text/html', 
-            value: html + `<br><br><div style="border-top:1px solid #EEE;padding-top:20px;font-size:12px;color:#666;">You are receiving this because you joined our loyalty programme. <a href="${process.env.PUBLIC_URL || 'http://localhost:3000'}/public/">Unsubscribe at any time here.</a></div>` 
-          }
-        ],
-        asm: process.env.SENDGRID_UNSUBSCRIBE_GROUP_ID ? { group_id: parseInt(process.env.SENDGRID_UNSUBSCRIBE_GROUP_ID) } : undefined
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[EMAIL] SendGrid Rejected Request (Status ${response.status}):`, errText);
-    } else {
-      console.log(`[EMAIL] Successfully delivered to SendGrid queue: ${subject}`);
-    }
-  } catch (err) {
-    console.error('[EMAIL] System/Network Error:', err.message);
-  }
-}
-
 // HELPERS
 async function getSettings() {
   try {
     const s = await get('SELECT * FROM settings LIMIT 1');
-    if (s && s.admin_pin) return s;
+    if (s) return s;
   } catch (e) {
-    console.error('[DB] Settings error:', e.message);
+    console.error('[DB] Settings table error:', e.message);
   }
+  // Return hardcoded defaults if DB fails or is empty
   return {
     restaurant_name: 'The Restaurant',
-    admin_pin: process.env.ADMIN_PIN || '1234',
+    admin_pin: '1234',
     discount_new: 10,
     discount_bronze: 10,
     discount_silver: 15,
     discount_gold: 20,
     discount_vip: 25,
-    bronze_threshold: 300,
-    silver_threshold: 600,
-    gold_threshold: 1000,
-    vip_threshold: 2000
+    vip_threshold: 2000,
+    retention_days: 14,
+    retention_discount: 10,
+    frequency_visits: 3,
+    frequency_days: 60,
+    frequency_discount: 10
   };
 }
 
@@ -158,24 +158,41 @@ async function verifyRecaptcha(token) {
   }
 }
 
-function tierDiscount(tier, settings, isFirstVisit = false) {
+async function calculateBestDiscount(customer, settings, isFirstVisit = false) {
   if (isFirstVisit) return settings.discount_new || 10;
-  const discounts = {
-    'none': 0,
-    'bronze': settings.discount_bronze,
-    'silver': settings.discount_silver,
-    'gold': settings.discount_gold,
-    'vip': settings.discount_vip
+  
+  // 1. Tier Discount
+  const tierDiscounts = {
+    'none': 0, 'bronze': settings.discount_bronze, 'silver': settings.discount_silver,
+    'gold': settings.discount_gold, 'vip': settings.discount_vip
   };
-  return discounts[tier] || 0;
+  let best = tierDiscounts[customer.current_tier] || 0;
+
+  // 2. Retention Discount (Back within X days)
+  const lastVisit = await get(`SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1`, [customer.id]);
+  if (lastVisit) {
+    const diffDays = (new Date() - new Date(lastVisit.visited_at + 'Z')) / (1000 * 60 * 60 * 24);
+    if (diffDays <= (settings.retention_days || 14)) {
+      best = Math.max(best, settings.retention_discount || 10);
+    }
+  }
+
+  // 3. Frequency Discount (X visits in last Y days)
+  const freqCutoff = isProd ? `NOW() - INTERVAL '${settings.frequency_days || 60} days'` : `DATETIME('now', '-${settings.frequency_days || 60} days')`;
+  const recentVisits = await get(`SELECT COUNT(*) as count FROM visits WHERE customer_id = ? AND visited_at > ${freqCutoff}`, [customer.id]);
+  if (recentVisits && recentVisits.count >= (settings.frequency_visits || 3)) {
+    best = Math.max(best, settings.frequency_discount || 10);
+  }
+
+  return best;
 }
 
-async function recalculateTier(customer, settings) {
+async function recalculateTier(customerId, settings) {
   const row = await get(`
     SELECT SUM(spend) as total_90d, COUNT(id) as visit_count 
     FROM visits 
-    WHERE customer_id = ? AND visited_at > DATETIME('now', '-90 days')
-  `, [customer.id]);
+    WHERE customer_id = ? AND visited_at > ${DAYS_90_AGO}
+  `, [customerId]);
 
   const spend = row.total_90d || 0;
   let tier = 'none';
@@ -185,17 +202,7 @@ async function recalculateTier(customer, settings) {
   else if (spend >= settings.silver_threshold) tier = 'silver';
   else if (spend >= settings.bronze_threshold) tier = 'bronze';
 
-  if (tier !== customer.current_tier && tier !== 'none') {
-    // Tier Up!
-    const discount = settings[`discount_${tier}`] || 0;
-    sendEmail(customer.email, 
-      `Congratulations! You've reached ${tier.toUpperCase()} Status`,
-      `You've unlocked ${discount}% off every visit!`,
-      `<h1>Tier Upgrade!</h1><p>You are now a <strong>${tier.toUpperCase()}</strong> member.</p><p>Enjoy ${discount}% off your next visit!</p>`
-    );
-  }
-
-  await run('UPDATE customers SET current_tier = ? WHERE id = ?', [tier, customer.id]);
+  await run('UPDATE customers SET current_tier = ? WHERE id = ?', [tier, customerId]);
   return { newTier: tier, spend90d: spend, visitCount: row.visit_count };
 }
 
@@ -214,36 +221,29 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
 
     await run(
       `INSERT INTO customers (name, email, phone, marketing_consent, consent_date, consent_ip) 
-       VALUES (?, ?, ?, ?, CASE WHEN ? THEN DATETIME('now') ELSE NULL END, CASE WHEN ? THEN ? ELSE NULL END)
+       VALUES (?, ?, ?, ?, CASE WHEN ? THEN ${NOW} ELSE NULL END, CASE WHEN ? THEN ? ELSE NULL END)
        ON CONFLICT (email) DO UPDATE SET 
          name = EXCLUDED.name,
          marketing_consent = EXCLUDED.marketing_consent,
-         consent_date = CASE WHEN EXCLUDED.marketing_consent THEN DATETIME('now') ELSE NULL END,
-         consent_ip = CASE WHEN EXCLUDED.marketing_consent THEN ? ELSE NULL END`,
+         consent_date = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_date, ${NOW}) ELSE NULL END,
+         consent_ip = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_ip, ?) ELSE NULL END`,
       [name, email, phone, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, req.ip, req.ip]
     );
 
     auditLog('customer_checkin', `${name} (${email})`);
-    const customer = await get('SELECT id, name, email, current_tier FROM customers WHERE email = ?', [email]);
+    const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email]);
     
     // Check if customer already existed or is brand new
     const checkNew = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
     const isFirstVisit = checkNew.count === 0;
 
-    if (isFirstVisit) {
-        sendEmail(email, 'Welcome to our Loyalty Programme!', 
-          `Hi ${name}, welcome! You've unlocked ${s.discount_new}% off your first visit.`,
-          `<h1>Welcome ${name}!</h1><p>Thanks for joining. Show this to staff to get <strong>${s.discount_new}% OFF</strong> today!</p>`
-        );
-    }
-
     if (spend > 0) {
       await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, spend]);
     }
 
-    const { newTier } = await recalculateTier(customer, s);
-    // Apply Welcome Discount if it's their first time
-    const discount = tierDiscount(newTier, s, isFirstVisit);
+    const { newTier } = await recalculateTier(customer.id, s);
+    // Calculate best possible discount (Tier vs Retention vs Frequency)
+    const discount = await calculateBestDiscount(customer, s, isFirstVisit);
 
     auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}, New: ${isFirstVisit}`);
     res.json({ success: true, name: customer.name, tier: newTier, discount });
@@ -262,7 +262,7 @@ app.get('/api/status', statusLimiter, async (req, res) => {
     const customer = await get('SELECT * FROM customers WHERE email = ?', [email.toLowerCase().trim()]);
     if (!customer) return res.json({ found: false });
 
-    const stats = await recalculateTier(customer, s);
+    const stats = await recalculateTier(customer.id, s);
     const lastVisit = await get('SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1', [customer.id]);
 
     const thresholds = { 'none': s.bronze_threshold, 'bronze': s.silver_threshold, 'silver': s.gold_threshold, 'gold': s.vip_threshold };
@@ -272,15 +272,17 @@ app.get('/api/status', statusLimiter, async (req, res) => {
     const nextThreshold = thresholds[customer.current_tier] || s.vip_threshold;
     const progressPercent = Math.min(100, (stats.spend90d / nextThreshold) * 100);
 
+    const discount = await calculateBestDiscount(customer, s);
+
     res.json({
       found: true,
       name: customer.name,
       tier: customer.current_tier,
       spend90d: stats.spend90d,
       totalVisits: stats.visitCount,
-      discount: tierDiscount(customer.current_tier, s),
+      discount,
       consentDate: new Date(customer.created_at).toLocaleDateString('en-GB'),
-      lastVisit: lastVisit ? new Date(lastVisit.visited_at).toLocaleDateString('en-GB') : 'Never',
+      lastVisit: lastVisit ? new Date(lastVisit.visited_at).toLocaleString('en-GB') : 'Never',
       nextTier,
       nextThreshold,
       progressPercent
@@ -295,21 +297,15 @@ app.get('/api/status', statusLimiter, async (req, res) => {
 const adminAuth = async (req, res, next) => {
   const pin = req.headers['x-admin-pin'];
   const s = await getSettings();
-  
-  // Emergency override for PIN from Env or DB
-  if (pin === (process.env.ADMIN_PIN || '1234') || pin === s.admin_pin) {
-    return next();
-  }
-  
-  console.warn(`[AUTH] Failed PIN attempt: ${pin} (Expected ${s.admin_pin})`);
+  if (pin === s.admin_pin) return next();
   res.status(401).json({ error: "Invalid PIN" });
 };
 
 app.get('/api/admin/stats', adminAuth, async (req, res) => {
   const total = await get('SELECT COUNT(*) as count FROM customers');
-  const today = await get("SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE DATE(visited_at) = DATE('now')");
-  const active = await get("SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE visited_at > DATETIME('now', '-90 days')");
-  const revenue = await get("SELECT SUM(spend) as sum FROM visits WHERE visited_at > DATETIME('now', '-90 days')");
+  const today = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE ${isProd ? "visited_at::date = CURRENT_DATE" : "DATE(visited_at) = DATE('now')"}`);
+  const active = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE visited_at > ${DAYS_90_AGO}`);
+  const revenue = await get(`SELECT SUM(spend) as sum FROM visits WHERE visited_at > ${DAYS_90_AGO}`);
   
   const tiers = await query('SELECT current_tier, COUNT(*) as count FROM customers GROUP BY current_tier');
   const tierCounts = { vip: 0, gold: 0, silver: 0, bronze: 0, none: 0 };
@@ -336,16 +332,17 @@ app.get('/api/admin/customers', adminAuth, async (req, res) => {
   const { search } = req.query;
   let sql = `
     SELECT c.*, 
-    (SELECT SUM(spend) FROM visits WHERE customer_id = c.id AND visited_at > DATETIME('now', '-90 days')) as spend_90d,
-    (SELECT COUNT(*) FROM visits WHERE customer_id = c.id) as visit_count
+    COALESCE(SUM(CASE WHEN v.visited_at > ${DAYS_90_AGO} THEN v.spend ELSE 0 END), 0) as spend_90d,
+    COUNT(v.id) as visit_count
     FROM customers c
+    LEFT JOIN visits v ON c.id = v.customer_id
   `;
   const params = [];
   if (search) {
     sql += ' WHERE c.name LIKE ? OR c.email LIKE ?';
     params.push(`%${search}%`, `%${search}%`);
   }
-  sql += ' ORDER BY c.created_at DESC';
+  sql += ' GROUP BY c.id ORDER BY c.created_at DESC';
   const customers = await query(sql, params);
   res.json(customers);
 });
@@ -361,20 +358,70 @@ app.delete('/api/admin/customers/:email', adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+app.delete('/api/admin/visits/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
+    if (visit) {
+      await run('DELETE FROM visits WHERE id = ?', [id]);
+      const s = await getSettings();
+      await recalculateTier(visit.customer_id, s);
+      auditLog('delete_visit', `Visit ID: ${id}`);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete visit' });
+  }
+});
+
+app.put('/api/admin/visits/:id/spend', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { spend } = req.body;
+    const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
+    if (visit) {
+      await run('UPDATE visits SET spend = ? WHERE id = ?', [spend, id]);
+      const s = await getSettings();
+      await recalculateTier(visit.customer_id, s);
+      auditLog('update_visit_spend', `Visit ID: ${id}, New: £${spend}`);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update visit' });
+  }
+});
+
 app.get('/api/admin/settings', adminAuth, async (req, res) => {
   const s = await getSettings();
   res.json(s);
 });
 
 app.put('/api/admin/settings', adminAuth, async (req, res) => {
-  const { restaurantName, restaurantEmail, restaurantAddress, bronze, silver, gold, vip, dNew, dBronze, dSilver, dGold, dVip, adminPin } = req.body;
+  const { 
+    restaurantName, restaurantEmail, restaurantAddress, 
+    bronze, silver, gold, vip, 
+    dNew, dBronze, dSilver, dGold, dVip, 
+    retentionDays, retentionDiscount, 
+    frequencyVisits, frequencyDays, frequencyDiscount,
+    adminPin 
+  } = req.body;
+
   await run(`
     UPDATE settings SET 
       restaurant_name = ?, restaurant_email = ?, restaurant_address = ?,
       bronze_threshold = ?, silver_threshold = ?, gold_threshold = ?, vip_threshold = ?,
       discount_new = ?, discount_bronze = ?, discount_silver = ?, discount_gold = ?, discount_vip = ?,
+      retention_days = ?, retention_discount = ?,
+      frequency_visits = ?, frequency_days = ?, frequency_discount = ?,
       admin_pin = COALESCE(NULLIF(?, ''), admin_pin)
-  `, [restaurantName, restaurantEmail, restaurantAddress, bronze, silver, gold, vip, dNew, dBronze, dSilver, dGold, dVip, adminPin]);
+  `, [
+    restaurantName, restaurantEmail, restaurantAddress, 
+    bronze, silver, gold, vip, 
+    dNew, dBronze, dSilver, dGold, dVip, 
+    retentionDays, retentionDiscount,
+    frequencyVisits, frequencyDays, frequencyDiscount,
+    adminPin
+  ]);
   
   auditLog('update_settings', `By admin`);
   res.json({ success: true });
@@ -394,9 +441,10 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
     FROM customers c
   `);
   
+  const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
   let csv = 'Name,Email,Phone,Tier,Visits,Total Spend,Marketing,Joined\n';
   customers.forEach(c => {
-    csv += `"${c.name}","${c.email}","${c.phone}","${c.current_tier}",${c.visits},${c.total_spend || 0},${c.marketing_consent ? 'YES' : 'NO'},"${c.created_at}"\n`;
+    csv += `${esc(c.name)},${esc(c.email)},${esc(c.phone)},${esc(c.current_tier)},${c.visits},${c.total_spend || 0},${c.marketing_consent ? 'YES' : 'NO'},${esc(c.created_at)}\n`;
   });
   
   auditLog('export_csv', 'Full customer list');
@@ -408,11 +456,11 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
 // CRON: Nightly cleanup at 02:00
 cron.schedule('0 2 * * *', async () => {
   console.log('[CRON] Starting data retention cleanup...');
-  // Delete customers inactive for 12 months
+  const cutoff = isProd ? "NOW() - INTERVAL '365 days'" : "DATETIME('now', '-365 days')";
   await run(`
     DELETE FROM customers WHERE id NOT IN (
-      SELECT DISTINCT customer_id FROM visits WHERE visited_at > DATETIME('now', '-365 days')
-    ) AND created_at < DATETIME('now', '-365 days')
+      SELECT DISTINCT customer_id FROM visits WHERE visited_at > ${cutoff}
+    ) AND created_at < ${cutoff}
   `);
   console.log('[CRON] Cleanup complete.');
 });

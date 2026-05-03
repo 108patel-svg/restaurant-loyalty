@@ -20,7 +20,12 @@ db.serialize(() => {
     discount_bronze REAL DEFAULT 10,
     discount_silver REAL DEFAULT 15,
     discount_gold REAL DEFAULT 20,
-    discount_vip REAL DEFAULT 25
+    discount_vip REAL DEFAULT 25,
+    retention_days INTEGER DEFAULT 14,
+    retention_discount REAL DEFAULT 10,
+    frequency_visits INTEGER DEFAULT 3,
+    frequency_days INTEGER DEFAULT 60,
+    frequency_discount REAL DEFAULT 10
   )`);
 
   // Ensure 1 row exists
