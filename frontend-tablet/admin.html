@@ -440,6 +440,19 @@
         .settings-card .primary {
             margin-top: 16px;
         }
+
+        .btn-delete {
+            background: transparent;
+            border: none;
+            color: #B3261E;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .btn-delete:hover {
+            background: #FEECEB;
+        }
     </style>
 </head>
 
@@ -474,6 +487,7 @@
             <button class="tab active" data-tab="tab-overview">Overview</button>
             <button class="tab" data-tab="tab-customers">Customers</button>
             <button class="tab" data-tab="tab-activity">Recent activity</button>
+            <button class="tab" data-tab="tab-audit">Audit log</button>
             <button class="tab" data-tab="tab-settings">Settings</button>
         </div>
 
@@ -558,6 +572,24 @@
                 </div>
             </div>
 
+            <!-- Audit Log Tab -->
+            <div id="tab-audit" class="tab-pane">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-tbody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Settings Tab -->
             <div id="tab-settings" class="tab-pane">
                 <div id="settings-alert"></div>
@@ -567,6 +599,14 @@
                         <div class="form-row">
                             <label>Restaurant Name</label>
                             <input type="text" id="set-name" style="width: 200px;">
+                        </div>
+                        <div class="form-row">
+                            <label>Restaurant Email</label>
+                            <input type="email" id="set-email" style="width: 200px;">
+                        </div>
+                        <div class="form-row">
+                            <label>Restaurant Address</label>
+                            <input type="text" id="set-address" style="width: 200px;">
                         </div>
                         <div class="form-row">
                             <label>Admin PIN (leave blank to keep)</label>
@@ -616,22 +656,24 @@
             });
 
             document.getElementById("login-form").addEventListener("submit", async (e) => {
-                e.preventDefault(); // Always prevent default at the very start
+                e.preventDefault();
                 try {
                     const pinInput = document.getElementById("pin-input");
                     const pin = pinInput.value;
-                    if (App.checkAdminPin(pin)) {
+                    App.setPin(pin);
+                    
+                    try {
+                        await loadDashboard();
                         document.getElementById("view-login").style.display = "none";
                         document.getElementById("view-dashboard").style.display = "block";
-                        await loadDashboard();
                         resetInactivityTimer();
-                    } else {
-                        App.setAlert("login-alert", "Incorrect PIN", "error");
+                    } catch (err) {
+                        App.setAlert("login-alert", "Incorrect PIN or server error", "error");
                         pinInput.value = "";
                     }
                 } catch (err) {
                     console.error("Login submission error:", err);
-                    App.setAlert("login-alert", "System error. Please try again.", "error");
+                    App.setAlert("login-alert", "System error.", "error");
                 }
             });
 
@@ -643,6 +685,7 @@
                     document.getElementById(tab.dataset.tab).classList.add("active");
 
                     if (tab.dataset.tab === "tab-customers") renderCustomers();
+                    if (tab.dataset.tab === "tab-audit") renderAuditLog();
                 });
             });
 
@@ -660,13 +703,12 @@
                 await renderCustomers();
             });
 
-            document.getElementById("btn-save-settings").addEventListener("click", () => {
-                const s = App.getSettings();
-                const name = document.getElementById("set-name").value.trim();
-                const pin = document.getElementById("set-pin").value.trim();
-
-                s.restaurant_name = name || s.restaurant_name;
-                if (pin && pin.length >= 4) s.admin_pin = pin;
+            document.getElementById("btn-save-settings").addEventListener("click", async () => {
+                const s = {};
+                s.restaurant_name = document.getElementById("set-name").value.trim();
+                s.restaurant_email = document.getElementById("set-email").value.trim();
+                s.restaurant_address = document.getElementById("set-address").value.trim();
+                s.admin_pin = document.getElementById("set-pin").value.trim();
 
                 s.bronze_threshold = Number(document.getElementById("set-t-bronze").value);
                 s.silver_threshold = Number(document.getElementById("set-t-silver").value);
@@ -679,18 +721,24 @@
                 s.discount_gold = Number(document.getElementById("set-d-gold").value);
                 s.discount_vip = Number(document.getElementById("set-d-vip").value);
 
-                App.saveSettingsData(s);
-                App.setAlert("settings-alert", "Settings saved successfully", "success");
-                document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
-                document.getElementById("set-pin").value = "";
+                try {
+                    await App.saveSettingsData(s);
+                    App.setAlert("settings-alert", "Settings saved successfully", "success");
+                    document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
+                    document.getElementById("set-pin").value = "";
+                } catch (e) {
+                    App.setAlert("settings-alert", "Failed to save settings", "error");
+                }
             });
 
             async function loadDashboard() {
                 try {
-                    const s = App.getSettings();
+                    const s = await App.fetchSettings();
                     document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
 
                     document.getElementById("set-name").value = s.restaurant_name;
+                    document.getElementById("set-email").value = s.restaurant_email || '';
+                    document.getElementById("set-address").value = s.restaurant_address || '';
                     document.getElementById("set-t-bronze").value = s.bronze_threshold;
                     document.getElementById("set-t-silver").value = s.silver_threshold;
                     document.getElementById("set-t-gold").value = s.gold_threshold;
@@ -717,7 +765,7 @@
                     await renderCustomers();
                 } catch (e) {
                     console.error(e);
-                    App.setAlert("dashboard-alert", "Error loading data. Check connection.", "error");
+                    throw e;
                 }
             }
 
@@ -728,13 +776,12 @@
                     const tbody = document.getElementById("customers-tbody");
 
                     if (customers.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--muted);">No customers found</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted);">No customers found</td></tr>`;
                         return;
                     }
 
                     tbody.innerHTML = customers.map(c => {
                         const d = new Date(c.created_at);
-                        
                         let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
                         if (c.marketing_consent) {
                             const mDate = new Date(c.consent_date);
@@ -752,7 +799,7 @@
                             </td>
                             <td><span class="badge badge-${c.current_tier}">${App.tierLabel(c.current_tier)}</span></td>
                             <td>${c.visit_count}</td>
-                            <td>£${c.spend_90d.toFixed(2)}</td>
+                            <td>£${(parseFloat(c.spend_90d) || 0).toFixed(2)}</td>
                             <td>${marketingHtml}</td>
                             <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
                             <td>
@@ -765,6 +812,27 @@
                 } catch (e) {
                     console.error(e);
                 }
+            }
+
+            async function renderAuditLog() {
+                try {
+                    const res = await fetch('/api/admin/audit-log', {
+                        headers: { 'x-admin-pin': App.getPin() }
+                    });
+                    const logs = await res.json();
+                    const tbody = document.getElementById("audit-tbody");
+                    if (logs.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--muted);">No logs found</td></tr>`;
+                        return;
+                    }
+                    tbody.innerHTML = logs.map(l => `
+                        <tr>
+                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${new Date(l.performed_at).toLocaleString('en-GB')}</td>
+                            <td style="font-weight: 500;">${escapeHTML(l.action)}</td>
+                            <td>${escapeHTML(l.details)}</td>
+                        </tr>
+                    `).join('');
+                } catch (e) { console.error(e); }
             }
 
             function renderActivity(visits) {
@@ -783,14 +851,6 @@
                         <div class="list-right">
                             <div class="spend">£${parseFloat(v.spend).toFixed(2)}</div>
                             <div class="badge badge-${v.tier}">${App.tierLabel(v.tier)}</div>
-                            <div class="actions" style="display: flex; gap: 8px; margin-left: 12px;">
-                                <button class="btn-icon" onclick="window.handleEditVisit(${v.id}, ${v.spend})" title="Edit Spend">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                </button>
-                                <button class="btn-icon" style="color: #B3261E;" onclick="window.handleDeleteVisit(${v.id})" title="Delete Record">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 `).join('');
@@ -802,30 +862,10 @@
                 return e.innerHTML;
             }
 
-            // Global Handlers for Admin Actions
             window.handleDeleteCustomer = async (email) => {
                 if (!confirm(`Delete all records for ${email}? This cannot be undone.`)) return;
                 try {
                     await App.deleteCustomer(email);
-                    await loadDashboard();
-                } catch (e) { alert(e.message); }
-            };
-
-            window.handleDeleteVisit = async (id) => {
-                if (!confirm(`Delete this visit record?`)) return;
-                try {
-                    await App.deleteVisit(id);
-                    await loadDashboard();
-                } catch (e) { alert(e.message); }
-            };
-
-            window.handleEditVisit = async (id, currentSpend) => {
-                const val = prompt("Enter new spend amount (£):", currentSpend);
-                if (val === null || val === "") return;
-                const spend = parseFloat(val);
-                if (isNaN(spend) || spend < 0) return alert("Invalid amount");
-                try {
-                    await App.editVisitSpend(id, spend);
                     await loadDashboard();
                 } catch (e) { alert(e.message); }
             };

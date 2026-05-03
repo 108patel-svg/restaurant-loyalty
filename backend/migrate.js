@@ -1,88 +1,62 @@
-require('dotenv').config();
-const { Pool } = require('pg');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
+const dbPath = path.join(__dirname, 'loyalty.db');
+const db = new sqlite3.Database(dbPath);
+
+db.serialize(() => {
+  // Settings Table
+  db.run(`CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    restaurant_name TEXT DEFAULT 'The Restaurant',
+    restaurant_email TEXT,
+    restaurant_address TEXT,
+    admin_pin TEXT DEFAULT '1234',
+    bronze_threshold REAL DEFAULT 300,
+    silver_threshold REAL DEFAULT 600,
+    gold_threshold REAL DEFAULT 1000,
+    vip_threshold REAL DEFAULT 2000,
+    discount_new REAL DEFAULT 10,
+    discount_bronze REAL DEFAULT 10,
+    discount_silver REAL DEFAULT 15,
+    discount_gold REAL DEFAULT 20,
+    discount_vip REAL DEFAULT 25
+  )`);
+
+  // Ensure 1 row exists
+  db.run(`INSERT OR IGNORE INTO settings (id) VALUES (1)`);
+
+  // Customers Table
+  db.run(`CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    current_tier TEXT DEFAULT 'none',
+    marketing_consent BOOLEAN DEFAULT 0,
+    consent_date DATETIME,
+    consent_ip TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Visits Table
+  db.run(`CREATE TABLE IF NOT EXISTS visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER,
+    spend REAL DEFAULT 0,
+    visited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers (id)
+  )`);
+
+  // Audit Log Table
+  db.run(`CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    details TEXT,
+    performed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  console.log('Database migrated successfully.');
 });
 
-async function migrate() {
-    try {
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS customers (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        phone TEXT,
-        current_tier TEXT NOT NULL DEFAULT 'none',
-        unsubscribed BOOLEAN NOT NULL DEFAULT FALSE,
-        marketing_consent BOOLEAN NOT NULL DEFAULT FALSE,
-        consent_date TIMESTAMPTZ,
-        consent_ip TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        // For existing databases: add the column if it doesn't exist yet
-        await pool.query(`
-      ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT;
-      ALTER TABLE customers ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN NOT NULL DEFAULT FALSE;
-      ALTER TABLE customers ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT FALSE;
-      ALTER TABLE customers ADD COLUMN IF NOT EXISTS consent_date TIMESTAMPTZ;
-      ALTER TABLE customers ADD COLUMN IF NOT EXISTS consent_ip TEXT;
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS visits (
-        id SERIAL PRIMARY KEY,
-        customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-        spend NUMERIC(10,2) NOT NULL,
-        visited_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_visits_customer_id ON visits(customer_id);
-      CREATE INDEX IF NOT EXISTS idx_visits_visited_at ON visits(visited_at);
-      CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY DEFAULT 1,
-        restaurant_name TEXT DEFAULT 'The Restaurant',
-        bronze_threshold NUMERIC DEFAULT 300,
-        silver_threshold NUMERIC DEFAULT 600,
-        gold_threshold NUMERIC DEFAULT 1000,
-        vip_threshold NUMERIC DEFAULT 2000,
-        discount_new NUMERIC DEFAULT 10,
-        discount_bronze NUMERIC DEFAULT 10,
-        discount_silver NUMERIC DEFAULT 15,
-        discount_gold NUMERIC DEFAULT 20,
-        discount_vip NUMERIC DEFAULT 25
-      );
-    `);
-
-        await pool.query(`
-      INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS pending_checkins (
-        id           SERIAL PRIMARY KEY,
-        customer_id  INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-        checked_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        spend_recorded BOOLEAN NOT NULL DEFAULT FALSE,
-        spend_recorded_at TIMESTAMPTZ
-      );
-      CREATE INDEX IF NOT EXISTS idx_pending_phone ON pending_checkins(customer_id);
-    `);
-
-        console.log("✓ Tables created");
-    } catch (err) {
-        console.error("Migration failed:", err);
-    } finally {
-        pool.end();
-    }
-}
-
-migrate();
+db.close();

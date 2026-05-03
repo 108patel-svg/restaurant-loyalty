@@ -64,47 +64,34 @@
     <div class="container">
         <a href="index.html" class="back-link">← Back to loyalty form</a>
 
-        <h1>Terms & Conditions & Privacy Policy</h1>
+        <h1 class="restaurant-name-disp">Loyalty Programme</h1>
+        <h2>Terms & Conditions & Privacy Policy</h2>
 
-        <h2>1. Introduction</h2>
-        <p>Welcome to our Restaurant Loyalty Programme. These Terms and Conditions and Privacy Policy govern your participation in our rewards scheme. By submitting the check-in form and participating in the programme, you agree to be bound by these terms.</p>
+        <div class="section">
+            <h3>1. Introduction</h3>
+            <p>Welcome to the loyalty programme of <span class="restaurant-name-disp">the restaurant</span>. By joining, you agree to these terms. This loyalty programme is open to customers aged 18 and over. If you are under 18, please do not submit your details.</p>
+        </div>
 
         <h2>2. What data we collect</h2>
         <p>We collect and process the following information when you check in:</p>
         <ul>
             <li><strong>Full name:</strong> To identify you in our system.</li>
             <li><strong>Email address:</strong> For account tracking and communication.</li>
-            <li><strong>Spend amount:</strong> To calculate your loyalty rewards.</li>
-            <li><strong>Visit history:</strong> The date and time of each visit.</li>
+            <li><strong>Phone number:</strong> Optional, for secondary identification.</li>
             <li><strong>Marketing consent:</strong> Whether you have opted in to receive updates, including the date and time of consent.</li>
+            <li><strong>Visit history:</strong> The date, time, and spend of each visit.</li>
             <li><strong>Loyalty tier:</strong> Your current status within the programme.</li>
         </ul>
 
         <h2>3. Why we collect it (legal basis)</h2>
         <p>We process your data under two lawful bases defined by the UK GDPR:</p>
         <ul>
-            <li><strong>Legitimate Interests:</strong> To operate the loyalty programme, track your rewards, and provide you with the services you signed up for.</li>
-            <li><strong>Consent:</strong> Specifically for sending marketing emails. Marketing consent is entirely optional and separate from your ability to participate in the loyalty programme.</li>
+            <li><strong>Legitimate Interests:</strong> To operate the loyalty programme and track your rewards.</li>
+            <li><strong>Consent:</strong> Specifically for sending marketing emails. Marketing consent is entirely optional and can be withdrawn at any time.</li>
         </ul>
 
-        <h2>4. How we use the data</h2>
-        <p>Your data is used specifically for the following purposes:</p>
-        <ul>
-            <li>To track and calculate your loyalty tier status automatically.</li>
-            <li>To display your reward progress on-screen during the check-in process.</li>
-            <li>To send automated tier-up notification emails (only if you have provided marketing consent).</li>
-            <li>To allow our staff to verify your visit history and apply discounts via the admin dashboard.</li>
-        </ul>
-
-        <h2>5. Who we share it with</h2>
-        <p>We value your privacy. We only share data with essential service providers:</p>
-        <ul>
-            <li><strong>SendGrid:</strong> Our email delivery service (used only if you consent to marketing). You can view their policy at <a href="https://sendgrid.com" target="_blank" style="color: var(--ember);">sendgrid.com</a>.</li>
-        </ul>
-        <p>We <strong>never</strong> sell your data to third parties, nor do we share it with advertisers.</p>
-
-        <h2>6. Our subprocessors</h2>
-        <p>We use the following third-party services that may process your personal data as part of running this loyalty programme. We have data processing agreements in place with each of these providers.</p>
+        <h2>4. Our subprocessors</h2>
+        <p>We use the following third-party services to run this loyalty programme. Your data is handled securely in accordance with UK GDPR.</p>
         
         <table class="subprocessor-table">
             <thead>
@@ -113,76 +100,72 @@
                     <th>Purpose</th>
                     <th>Data shared</th>
                     <th>Location</th>
-                    <th>Link</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>Twilio Inc.</td>
-                    <td>SMS verification — sending one-time codes to verify your phone number</td>
+                    <td>Communication services.</td>
                     <td>Phone number</td>
-                    <td>USA (EU data transfer safeguards apply)</td>
-                    <td><a href="https://twilio.com/legal/privacy" target="_blank">twilio.com/legal/privacy</a></td>
+                    <td>USA (Standard Contractual Clauses)</td>
                 </tr>
                 <tr>
                     <td>SendGrid (Twilio)</td>
-                    <td>Email delivery — sending tier-up reward notifications</td>
+                    <td>Email delivery for rewards.</td>
                     <td>Name, email address</td>
-                    <td>USA (EU data transfer safeguards apply)</td>
-                    <td><a href="https://sendgrid.com/policies/privacy" target="_blank">sendgrid.com/policies/privacy</a></td>
+                    <td>USA (Standard Contractual Clauses)</td>
                 </tr>
                 <tr>
                     <td>[Hosting Provider]</td>
-                    <td>Website and database hosting</td>
-                    <td>All customer data stored in the database</td>
+                    <td>Cloud infrastructure.</td>
+                    <td>Database records</td>
                     <td>[To be completed by restaurant]</td>
-                    <td>—</td>
-                </tr>
-                <tr>
-                    <td>[PostgreSQL Provider]</td>
-                    <td>Database storage</td>
-                    <td>All customer data</td>
-                    <td>[To be completed by restaurant]</td>
-                    <td>—</td>
                 </tr>
             </tbody>
         </table>
 
-        <p>We do not use any advertising subprocessors. We do not share your data with social media platforms. We do not use analytics tools that track you across other websites.</p>
-        <p>If you would like an up-to-date list of our subprocessors or have concerns about any of them, please contact us at <strong>loyalty@yourrestaurant.com</strong>.</p>
+        <h2>5. How long we keep it</h2>
+        <p>We retain your data for as long as you are an active member. If you do not visit for 12 months, your data is automatically deleted. You can also request deletion at any time.</p>
 
-        <h2>7. How long we keep it</h2>
-        <p>We retain your data for as long as you are an active member of the loyalty programme. If you do not visit for a period of 12 months, your data will be automatically deleted. You may also request earlier deletion at any time.</p>
+        <h2>6. Your Rights</h2>
+        <p>Under the UK GDPR, you have the right to access, correct, or delete your data. You can also withdraw your marketing consent via the unsubscribe link in any email.</p>
 
-        <h2>7. Loyalty tracking disclosure</h2>
-        <p>Please be aware that every time you scan the QR code and submit the check-in form, your visit is recorded. Your cumulative spend over a rolling 90-day window is calculated automatically to determine your tier. This tracking is used solely for the purpose of rewards and you are informed of your status on every visit.</p>
+        <h2>7. Contact us</h2>
+        <p>If you have any questions, please contact us at:</p>
+        <p>
+            <strong>Restaurant:</strong> <span class="restaurant-name-disp">[Restaurant Name]</span><br>
+            <strong>Email:</strong> <span id="contact-email">[INSERT RESTAURANT EMAIL]</span><br>
+            <strong>Address:</strong> <span id="contact-address">[INSERT RESTAURANT ADDRESS]</span>
+        </p>
 
-        <h2>8. Customer rights (UK GDPR)</h2>
-        <p>Under the UK GDPR, you have the following rights:</p>
-        <ul>
-            <li><strong>Right to be informed:</strong> Clear information about how we use your data (provided here).</li>
-            <li><strong>Right of access:</strong> You can request a copy of the data we hold about you.</li>
-            <li><strong>Right to rectification:</strong> You can ask us to correct inaccurate information.</li>
-            <li><strong>Right to erasure:</strong> The "right to be forgotten"—you can ask us to delete your data.</li>
-            <li><strong>Right to restrict processing:</strong> You can ask us to temporarily stop using your data.</li>
-            <li><strong>Right to data portability:</strong> You can request your data in a machine-readable format.</li>
-            <li><strong>Right to object:</strong> You can object to our use of your data for certain purposes.</li>
-            <li><strong>Rights related to automated decision making:</strong> You have rights regarding decisions made without human intervention (like your tier calculation).</li>
-        </ul>
-
-        <h2>9. How to exercise your rights</h2>
-        <p>To exercise any of your rights, please email us at <strong>loyalty@yourrestaurant.com</strong> with the subject line "Data Request". We will respond to all requests within 30 days.</p>
-
-        <h2>10. Cookies</h2>
-        <p>This application uses <strong>localStorage</strong> (browser-based storage) to maintain system settings and session data in demo mode. We do not use tracking cookies or third-party advertising cookies.</p>
-
-        <h2>11. Changes to this policy</h2>
-        <p>We may update this policy from time to time. If significant changes are made, we will notify you via email if you have consented to marketing communications.</p>
-
-        <h2>12. Contact</h2>
-        <p>If you have any questions, please contact us at <strong>loyalty@yourrestaurant.com</strong>. You also have the right to lodge a complaint with the UK Information Commissioner's Office at <a href="https://ico.org.uk" target="_blank" style="color: var(--ember);">ico.org.uk</a>.</p>
+        <p style="margin-top: 40px; font-size: 14px; color: var(--muted); text-align: center;">
+            Last updated: May 2024
+        </p>
 
         <a href="index.html" class="back-link footer-link">← Back to loyalty form</a>
     </div>
+
+    <script>
+        async function loadSettings() {
+            try {
+                // Fetch settings from the internal admin endpoint (using default PIN for terms viewing)
+                const res = await fetch('/api/admin/settings', { headers: { 'x-admin-pin': '1234' } });
+                const data = await res.json();
+                if (data.restaurant_name) {
+                    document.querySelectorAll('.restaurant-name-disp').forEach(el => el.innerText = data.restaurant_name);
+                }
+                if (data.restaurant_email) {
+                    document.getElementById('contact-email').innerText = data.restaurant_email;
+                }
+                if (data.restaurant_address) {
+                    document.getElementById('contact-address').innerText = data.restaurant_address;
+                }
+            } catch (e) {
+                console.error("Failed to load restaurant details", e);
+                document.getElementById('contact-email').innerText = 'Contact the restaurant';
+            }
+        }
+        loadSettings();
+    </script>
 </body>
 </html>

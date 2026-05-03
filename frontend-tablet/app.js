@@ -1,35 +1,40 @@
 const App = (() => {
-    const SETTINGS_KEY = 'loyalty_settings';
+    let cachedSettings = null;
+    let adminPin = localStorage.getItem('admin_session_pin') || '1234';
 
-    const defaultSettings = {
-        restaurant_name: 'The Restaurant',
-        bronze_threshold: 300,
-        silver_threshold: 600,
-        gold_threshold: 1000,
-        vip_threshold: 2000,
-        discount_new: 10,
-        discount_bronze: 10,
-        discount_silver: 15,
-        discount_gold: 20,
-        discount_vip: 25,
-        admin_pin: '1234'
-    };
+    function setPin(pin) {
+        adminPin = pin;
+        localStorage.setItem('admin_session_pin', pin);
+    }
 
-    function getSettings() {
-        const s = localStorage.getItem(SETTINGS_KEY);
-        return s ? JSON.parse(s) : { ...defaultSettings };
+    function getPin() {
+        return adminPin;
+    }
+
+    async function fetchSettings() {
+        const res = await fetch('/api/admin/settings', {
+            headers: { 'x-admin-pin': getPin() }
+        });
+        if (!res.ok) throw new Error('Failed to fetch settings');
+        cachedSettings = await res.json();
+        return cachedSettings;
+    }
+
+    function getCachedSettings() {
+        return cachedSettings;
     }
 
     async function saveSettingsData(settings) {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        await fetch('/api/admin/settings', {
+        const res = await fetch('/api/admin/settings', {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
-                'x-admin-pin': settings.admin_pin 
+                'x-admin-pin': getPin() 
             },
             body: JSON.stringify({
                 restaurantName: settings.restaurant_name,
+                restaurantEmail: settings.restaurant_email,
+                restaurantAddress: settings.restaurant_address,
                 bronze: settings.bronze_threshold,
                 silver: settings.silver_threshold,
                 gold: settings.gold_threshold,
@@ -38,60 +43,58 @@ const App = (() => {
                 dBronze: settings.discount_bronze,
                 dSilver: settings.discount_silver,
                 dGold: settings.discount_gold,
-                dVip: settings.discount_vip
+                dVip: settings.discount_vip,
+                adminPin: settings.admin_pin
             })
         });
-    }
-
-    function tierOrder(tier) {
-        const order = { 'none': 0, 'bronze': 1, 'silver': 2, 'gold': 3, 'vip': 4 };
-        return order[tier] || 0;
-    }
-
-    function tierLabel(tier) {
-        const labels = { 'none': 'No tier', 'bronze': 'Bronze', 'silver': 'Silver', 'gold': 'Gold', 'vip': 'VIP' };
-        return labels[tier] || 'Unknown';
+        if (!res.ok) throw new Error('Failed to save settings');
+        if (settings.admin_pin) setPin(settings.admin_pin);
+        return await res.json();
     }
 
     async function getAllCustomers(searchString = '') {
         const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(searchString)}`, {
-            headers: { 'x-admin-pin': getSettings().admin_pin }
+            headers: { 'x-admin-pin': getPin() }
         });
         if (!res.ok) throw new Error('Failed to fetch customers');
-        const customers = await res.json();
-        return customers.map(c => ({
-            ...c,
-            spend_90d: parseFloat(c.spend_90d) || 0,
-            visit_count: parseInt(c.visit_count) || 0
-        }));
+        return await res.json();
     }
 
     async function getAdminStats() {
         const res = await fetch('/api/admin/stats', {
-            headers: { 'x-admin-pin': getSettings().admin_pin }
+            headers: { 'x-admin-pin': getPin() }
         });
         if (!res.ok) throw new Error('Failed to fetch stats');
         return await res.json();
     }
 
-    function checkAdminPin(pin) {
-        const s = getSettings();
-        return pin === s.admin_pin;
+    async function deleteCustomer(email) {
+        const res = await fetch(`/api/admin/customers/${encodeURIComponent(email)}`, {
+            method: 'DELETE',
+            headers: { 'x-admin-pin': getPin() }
+        });
+        if (!res.ok) throw new Error('Failed to delete customer');
+        return await res.json();
     }
 
     async function exportCSV() {
         const res = await fetch('/api/admin/export', {
-            headers: { 'x-admin-pin': getSettings().admin_pin }
+            headers: { 'x-admin-pin': getPin() }
         });
         if (!res.ok) throw new Error('Export failed');
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "customers_export.csv";
+        a.download = `loyalty_export_${new Date().toISOString().slice(0,10)}.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
+    }
+
+    function tierLabel(tier) {
+        const labels = { 'none': 'No tier', 'bronze': 'Bronze', 'silver': 'Silver', 'gold': 'Gold', 'vip': 'VIP' };
+        return labels[tier] || 'Unknown';
     }
 
     function setAlert(containerId, message, type = 'error') {
@@ -107,63 +110,17 @@ const App = (() => {
         }
     }
 
-    async function deleteCustomer(email) {
-        const res = await fetch(`/api/admin/customers/${encodeURIComponent(email)}`, {
-            method: 'DELETE',
-            headers: { 'x-admin-pin': getSettings().admin_pin }
-        });
-        if (!res.ok) throw new Error('Failed to delete customer');
-        return await res.json();
-    }
-
-    async function deleteVisit(id) {
-        const res = await fetch(`/api/admin/visits/${id}`, {
-            method: 'DELETE',
-            headers: { 'x-admin-pin': getSettings().admin_pin }
-        });
-        if (!res.ok) throw new Error('Failed to delete visit');
-        return await res.json();
-    }
-
-    async function editVisitSpend(id, spend) {
-        const res = await fetch(`/api/admin/visits/${id}/spend`, {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'x-admin-pin': getSettings().admin_pin 
-            },
-            body: JSON.stringify({ spend })
-        });
-        if (!res.ok) throw new Error('Failed to update spend');
-        return await res.json();
-    }
-
-    function setupInactivityLogout(onLogout) {
-        let inactivityTimer;
-        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-        function resetTimer() {
-            clearTimeout(inactivityTimer);
-            inactivityTimer = setTimeout(onLogout, INACTIVITY_TIMEOUT);
-        }
-        ['click', 'touchstart', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
-            document.addEventListener(evt, resetTimer);
-        });
-        resetTimer();
-    }
-
     return {
-        getSettings,
+        setPin,
+        getPin,
+        fetchSettings,
+        getCachedSettings,
         saveSettingsData,
         getAdminStats,
         getAllCustomers,
         exportCSV,
-        checkAdminPin,
-        tierOrder,
         tierLabel,
         setAlert,
-        deleteCustomer,
-        deleteVisit,
-        editVisitSpend,
-        setupInactivityLogout
+        deleteCustomer
     };
 })();
