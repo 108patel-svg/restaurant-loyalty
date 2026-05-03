@@ -320,6 +320,22 @@ const App = (() => {
         return await res.json();
     }
 
+    function setupInactivityLogout(onLogout) {
+        let inactivityTimer;
+        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+        function resetTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(onLogout, INACTIVITY_TIMEOUT);
+        }
+
+        ['click', 'touchstart', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
+            document.addEventListener(evt, resetTimer);
+        });
+        
+        resetTimer();
+    }
+
     return {
         getSettings,
         saveSettingsData,
@@ -338,6 +354,7 @@ const App = (() => {
         resetForm,
         deleteCustomer,
         deleteVisit,
-        editVisitSpend
+        editVisitSpend,
+        setupInactivityLogout
     };
 })();

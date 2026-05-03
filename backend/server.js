@@ -30,7 +30,7 @@ app.use(helmet({
 
 // CORS RESTRICTION
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || []
 }));
 app.use(express.json());
 
@@ -152,10 +152,12 @@ async function sendEmail(to, subject, bodyHtml, resName) {
   }
   // Check if user has unsubscribed
   try {
-    const check = await pool.query('SELECT unsubscribed FROM customers WHERE email = $1', [to.toLowerCase()]);
-    if (check.rows.length > 0 && check.rows[0].unsubscribed) {
-      console.log(`[EMAIL SKIPPED] ${to} is unsubscribed.`);
-      return;
+    const check = await pool.query('SELECT unsubscribed, marketing_consent FROM customers WHERE email = $1', [to.toLowerCase()]);
+    if (check.rows.length > 0) {
+      if (check.rows[0].unsubscribed || !check.rows[0].marketing_consent) {
+        console.log(`[EMAIL SKIPPED] ${to} unsubscribed or no consent.`);
+        return;
+      }
     }
   } catch (e) { /* proceed if check fails */ }
   try {
