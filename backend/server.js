@@ -18,7 +18,9 @@ let db;
 if (isProd) {
   db = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000, // 5 seconds
+    idleTimeoutMillis: 30000
   });
 } else {
   const dbPath = path.join(__dirname, 'loyalty.db');
@@ -203,6 +205,23 @@ async function recalculateTier(customerId, settings) {
   await run('UPDATE customers SET current_tier = ? WHERE id = ?', [tier, customerId]);
   return { newTier: tier, spend90d: spend, visitCount: row.visit_count };
 }
+
+// Health Check & Debug (Public)
+app.get('/api/debug', async (req, res) => {
+  const status = {
+    env: isProd ? 'production' : 'development',
+    db_connected: false,
+    db_error: null,
+    has_db_url: !!process.env.DATABASE_URL
+  };
+  try {
+    await get('SELECT 1');
+    status.db_connected = true;
+  } catch (err) {
+    status.db_error = err.message;
+  }
+  res.json(status);
+});
 
 // ENDPOINTS
 app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
