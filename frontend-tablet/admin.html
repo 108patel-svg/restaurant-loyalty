@@ -293,12 +293,6 @@
             border: 1px solid #C8A84B;
         }
 
-        .badge-vip {
-            background: #1A1410;
-            color: #C8A84B;
-            border: 1px solid #8A6A20;
-        }
-
         .table-container {
             background: var(--bg-light);
             border: 1px solid var(--border);
@@ -517,10 +511,6 @@
                     <h3>Tier breakdown</h3>
                     <div class="tier-grid">
                         <div class="tier-stat">
-                            <div class="count" id="count-vip">0</div>
-                            <div class="badge badge-vip">VIP</div>
-                        </div>
-                        <div class="tier-stat">
                             <div class="count" id="count-gold">0</div>
                             <div class="badge badge-gold">GOLD</div>
                         </div>
@@ -617,7 +607,6 @@
                         <div class="form-row"><label>Bronze</label><input type="number" id="set-t-bronze"></div>
                         <div class="form-row"><label>Silver</label><input type="number" id="set-t-silver"></div>
                         <div class="form-row"><label>Gold</label><input type="number" id="set-t-gold"></div>
-                        <div class="form-row"><label>VIP</label><input type="number" id="set-t-vip"></div>
                         <div class="form-row"><label>Review Period (days)</label><input type="number" id="set-t-window"></div>
                     </div>
 
@@ -627,7 +616,6 @@
                         <div class="form-row"><label>Bronze</label><input type="number" id="set-d-bronze"></div>
                         <div class="form-row"><label>Silver</label><input type="number" id="set-d-silver"></div>
                         <div class="form-row"><label>Gold</label><input type="number" id="set-d-gold"></div>
-                        <div class="form-row"><label>VIP</label><input type="number" id="set-d-vip"></div>
 
                         <h3 style="margin-top: 32px;">Bonus Rewards</h3>
                         <div style="background: rgba(196, 83, 26, 0.03); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
@@ -732,7 +720,6 @@
                 s.discount_bronze = Number(document.getElementById("set-d-bronze").value);
                 s.discount_silver = Number(document.getElementById("set-d-silver").value);
                 s.discount_gold = Number(document.getElementById("set-d-gold").value);
-                s.discount_vip = Number(document.getElementById("set-d-vip").value);
 
                 s.retentionDays = Number(document.getElementById("set-r-days").value);
                 s.retentionDiscount = Number(document.getElementById("set-r-disc").value);
@@ -767,7 +754,6 @@
                     document.getElementById("set-d-bronze").value = s.discount_bronze;
                     document.getElementById("set-d-silver").value = s.discount_silver;
                     document.getElementById("set-d-gold").value = s.discount_gold;
-                    document.getElementById("set-d-vip").value = s.discount_vip;
 
                     document.getElementById("set-r-days").value = s.retention_days;
                     document.getElementById("set-r-disc").value = s.retention_discount;
@@ -782,7 +768,6 @@
                     document.getElementById("stat-active").innerText = stats.active90d;
                     document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
 
-                    document.getElementById("count-vip").innerText = stats.tierCounts.vip;
                     document.getElementById("count-gold").innerText = stats.tierCounts.gold;
                     document.getElementById("count-silver").innerText = stats.tierCounts.silver;
                     document.getElementById("count-bronze").innerText = stats.tierCounts.bronze;

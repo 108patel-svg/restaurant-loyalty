@@ -38,12 +38,16 @@ const App = (() => {
                 bronze: settings.bronze_threshold,
                 silver: settings.silver_threshold,
                 gold: settings.gold_threshold,
-                vip: settings.vip_threshold,
                 dNew: settings.discount_new,
                 dBronze: settings.discount_bronze,
                 dSilver: settings.discount_silver,
                 dGold: settings.discount_gold,
-                dVip: settings.discount_vip,
+                retentionDays: settings.retentionDays,
+                retentionDiscount: settings.retentionDiscount,
+                frequencyVisits: settings.frequencyVisits,
+                frequencyDays: settings.frequencyDays,
+                frequencyDiscount: settings.frequencyDiscount,
+                tierWindowDays: settings.tierWindowDays,
                 adminPin: settings.admin_pin
             })
         });
@@ -93,7 +97,7 @@ const App = (() => {
     }
 
     function tierLabel(tier) {
-        const labels = { 'none': 'No tier', 'bronze': 'Bronze', 'silver': 'Silver', 'gold': 'Gold', 'vip': 'VIP' };
+        const labels = { 'none': 'No tier', 'bronze': 'Bronze', 'silver': 'Silver', 'gold': 'Gold' };
         return labels[tier] || 'Unknown';
     }
 

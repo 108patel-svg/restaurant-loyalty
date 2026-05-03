@@ -121,8 +121,6 @@ async function getSettings() {
     discount_bronze: 10,
     discount_silver: 15,
     discount_gold: 20,
-    discount_vip: 25,
-    vip_threshold: 2000,
     retention_days: 14,
     retention_discount: 10,
     frequency_visits: 3,
@@ -165,7 +163,7 @@ async function calculateBestDiscount(customer, settings, isFirstVisit = false) {
   // 1. Tier Discount
   const tierDiscounts = {
     'none': 0, 'bronze': settings.discount_bronze, 'silver': settings.discount_silver,
-    'gold': settings.discount_gold, 'vip': settings.discount_vip
+    'gold': settings.discount_gold
   };
   let best = tierDiscounts[customer.current_tier] || 0;
 
@@ -198,8 +196,7 @@ async function recalculateTier(customerId, settings) {
   const spend = row.total_90d || 0;
   let tier = 'none';
 
-  if (spend >= settings.vip_threshold) tier = 'vip';
-  else if (spend >= settings.gold_threshold) tier = 'gold';
+  if (spend >= settings.gold_threshold) tier = 'gold';
   else if (spend >= settings.silver_threshold) tier = 'silver';
   else if (spend >= settings.bronze_threshold) tier = 'bronze';
 
@@ -266,11 +263,11 @@ app.get('/api/status', statusLimiter, async (req, res) => {
     const stats = await recalculateTier(customer.id, s);
     const lastVisit = await get('SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1', [customer.id]);
 
-    const thresholds = { 'none': s.bronze_threshold, 'bronze': s.silver_threshold, 'silver': s.gold_threshold, 'gold': s.vip_threshold };
-    const nextTierNames = { 'none': 'bronze', 'bronze': 'silver', 'silver': 'gold', 'gold': 'vip' };
+    const thresholds = { 'none': s.bronze_threshold, 'bronze': s.silver_threshold, 'silver': s.gold_threshold };
+    const nextTierNames = { 'none': 'bronze', 'bronze': 'silver', 'silver': 'gold' };
     
-    const nextTier = nextTierNames[customer.current_tier] || 'vip';
-    const nextThreshold = thresholds[customer.current_tier] || s.vip_threshold;
+    const nextTier = nextTierNames[customer.current_tier] || 'gold';
+    const nextThreshold = thresholds[customer.current_tier] || s.gold_threshold;
     const progressPercent = Math.min(100, (stats.spend90d / nextThreshold) * 100);
 
     const discount = await calculateBestDiscount(customer, s);
@@ -321,7 +318,7 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
   const revenue = await get(`SELECT SUM(spend) as sum FROM visits WHERE visited_at > ${getWindowAgo(s.tier_window_days)}`);
   
   const tiers = await query('SELECT current_tier, COUNT(*) as count FROM customers GROUP BY current_tier');
-  const tierCounts = { vip: 0, gold: 0, silver: 0, bronze: 0, none: 0 };
+  const tierCounts = { gold: 0, silver: 0, bronze: 0, none: 0 };
   tiers.forEach(t => tierCounts[t.current_tier] = t.count);
 
   const recent = await query(`
@@ -413,8 +410,8 @@ app.get('/api/admin/settings', adminAuth, async (req, res) => {
 app.put('/api/admin/settings', adminAuth, async (req, res) => {
   const { 
     restaurantName, restaurantEmail, restaurantAddress, 
-    bronze, silver, gold, vip, 
-    dNew, dBronze, dSilver, dGold, dVip, 
+    bronze, silver, gold, 
+    dNew, dBronze, dSilver, dGold, 
     retentionDays, retentionDiscount, 
     frequencyVisits, frequencyDays, frequencyDiscount,
     tierWindowDays,
@@ -424,16 +421,16 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
   await run(`
     UPDATE settings SET 
       restaurant_name = ?, restaurant_email = ?, restaurant_address = ?,
-      bronze_threshold = ?, silver_threshold = ?, gold_threshold = ?, vip_threshold = ?,
-      discount_new = ?, discount_bronze = ?, discount_silver = ?, discount_gold = ?, discount_vip = ?,
+      bronze_threshold = ?, silver_threshold = ?, gold_threshold = ?,
+      discount_new = ?, discount_bronze = ?, discount_silver = ?, discount_gold = ?,
       retention_days = ?, retention_discount = ?,
       frequency_visits = ?, frequency_days = ?, frequency_discount = ?,
       tier_window_days = ?,
       admin_pin = COALESCE(NULLIF(?, ''), admin_pin)
   `, [
     restaurantName, restaurantEmail, restaurantAddress, 
-    bronze, silver, gold, vip, 
-    dNew, dBronze, dSilver, dGold, dVip, 
+    bronze, silver, gold, 
+    dNew, dBronze, dSilver, dGold, 
     retentionDays, retentionDiscount,
     frequencyVisits, frequencyDays, frequencyDiscount,
     tierWindowDays,
