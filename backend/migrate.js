@@ -11,8 +11,8 @@ async function migrate() {
       CREATE TABLE IF NOT EXISTS customers (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        phone TEXT UNIQUE,
-        email TEXT UNIQUE,
+        email TEXT UNIQUE NOT NULL,
+        phone TEXT,
         current_tier TEXT NOT NULL DEFAULT 'none',
         unsubscribed BOOLEAN NOT NULL DEFAULT FALSE,
         marketing_consent BOOLEAN NOT NULL DEFAULT FALSE,
@@ -24,7 +24,7 @@ async function migrate() {
 
         // For existing databases: add the column if it doesn't exist yet
         await pool.query(`
-      ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT UNIQUE;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS consent_date TIMESTAMPTZ;

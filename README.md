@@ -1,48 +1,33 @@
 # Restaurant Loyalty Programme
 
-A full-stack loyalty rewards system for restaurants. Features include customer tier tracking (Bronze, Silver, Gold, VIP), automated email rewards via SendGrid, and an admin dashboard.
+Dual-site architecture for in-restaurant and customer-facing loyalty management.
 
-## Tech Stack
-- **Frontend**: Vanilla HTML/CSS/JS
-- **Backend**: Node.js, Express
-- **Database**: PostgreSQL
-- **Email**: SendGrid
+## 🏗️ Architecture
 
-## Getting Started
+The app is split into two completely separate deployments:
 
-### 1. Prerequisites
-- Node.js installed
-- A PostgreSQL database (local or hosted like Neon.tech/ElephantSQL)
-- A SendGrid API Key (optional, for emails)
+### Site 1: Restaurant Tablet (Internal)
+**URL**: `http://localhost:3000/tablet/`
+Used physically in the restaurant on a tablet at the till.
+- **Check-in**: Customers enter Name and Email (Required).
+- **Cashier Dashboard**: Staff record spend for pending check-ins (`/tablet/cashier.html`).
+- **Admin Dashboard**: Staff manage settings and export data (`/tablet/admin.html`).
 
-### 2. Setup
-1. Clone the repository.
-2. Go to the `backend` folder:
-   ```bash
-   cd backend
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Create a `.env` file based on `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
-5. Fill in your `DATABASE_URL` and `SENDGRID_API_KEY`.
+### Site 2: Customer Rewards Portal (Public)
+**URL**: `http://localhost:3000/public/`
+Customers scan a QR code to check their own status on their phones.
+- **Status Check**: Customers enter their email to see their current tier, spend, and discounts.
+- **Unsubscribe**: Manage email preferences.
 
-### 3. Database Migration
-Run the migration script to create the necessary tables:
-```bash
-npm run migrate
-```
+## 🔐 Security
 
-### 4. Running the App
-Start the backend server:
-```bash
-npm start
-```
-The app will be available at `http://localhost:3000`.
+- **reCAPTCHA v3**: Invisible protection on all forms to prevent bot submissions.
+- **PIN Authentication**: Staff pages are protected by a 4-digit PIN (Default: `1234`).
+- **GDPR Compliance**: Subprocessor disclosure included in terms, with easy unsubscribe options.
 
-## Collaboration
-To collaborate, push your changes to a new branch and create a Pull Request.
+## 🚀 Getting Started
+
+1. Install dependencies: `npm install`
+2. Set up your `.env` file (see `.env.example`).
+3. Run migrations: `node backend/migrate.js`
+4. Start the server: `npm start`

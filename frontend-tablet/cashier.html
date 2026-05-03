@@ -83,8 +83,8 @@
             <summary style="cursor: pointer; font-weight: 500;">Record spend manually</summary>
             <div style="margin-top: 24px;">
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; font-size: 14px; margin-bottom: 8px;">Phone Number</label>
-                    <input type="tel" id="manual-phone" placeholder="+44 7700 900000">
+                    <label style="display: block; font-size: 14px; margin-bottom: 8px;">Email Address</label>
+                    <input type="email" id="manual-email" placeholder="e.g. john@example.com">
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                     <label style="display: block; font-size: 14px; margin-bottom: 8px;">Spend Amount (£)</label>
@@ -99,6 +99,7 @@
     <div id="modal-spend">
         <div class="modal-content">
             <h2 id="modal-cust-name">Customer Name</h2>
+            <p id="modal-cust-email" style="margin-bottom: 24px; color: var(--muted); font-size: 14px;"></p>
             <p style="margin-bottom: 24px; color: var(--muted);">Tier: <span id="modal-cust-tier">None</span></p>
             <label style="display: block; font-size: 14px; margin-bottom: 8px;">Spend Amount (£)</label>
             <input type="number" id="spend-amount" step="0.01" min="0.01" max="500" placeholder="0.00">
@@ -111,7 +112,7 @@
 
     <script>
         let adminPin = '';
-        let currentPhone = '';
+        let currentEmail = '';
         let pendingData = [];
 
         async function verifyPin() {
@@ -148,14 +149,13 @@
             }
             let html = '<ul class="pending-list">';
             pendingData.forEach(p => {
-                const last4 = p.phone.slice(-4);
                 html += `
                     <li class="pending-row">
                         <div class="cust-info">
                             <h3>${p.name} <span class="badge">${p.tier}</span></h3>
-                            <p>•••• ${last4} &bull; ${p.timeAgo} minutes ago</p>
+                            <p>${p.email} &bull; ${p.timeAgo} minutes ago</p>
                         </div>
-                        <button class="btn btn-primary" onclick="openModal('${p.phone}', '${p.name}', '${p.tier}')">Record spend</button>
+                        <button class="btn btn-primary" onclick="openModal('${p.email}', '${p.name}', '${p.tier}')">Record spend</button>
                     </li>
                 `;
             });
@@ -163,9 +163,10 @@
             container.innerHTML = html;
         }
 
-        function openModal(phone, name, tier) {
-            currentPhone = phone;
+        function openModal(email, name, tier) {
+            currentEmail = email;
             document.getElementById('modal-cust-name').innerText = name;
+            document.getElementById('modal-cust-email').innerText = email;
             document.getElementById('modal-cust-tier').innerText = tier;
             document.getElementById('spend-amount').value = '';
             document.getElementById('modal-spend').style.display = 'flex';
@@ -176,24 +177,24 @@
         }
 
         async function recordSpend(type) {
-            let phone = currentPhone;
+            let email = currentEmail;
             let spend = 0;
             
             if (type === 'manual') {
-                phone = document.getElementById('manual-phone').value;
+                email = document.getElementById('manual-email').value;
                 spend = document.getElementById('manual-spend').value;
             } else {
                 spend = document.getElementById('spend-amount').value;
             }
 
-            if (!phone || !spend) return alert("Please fill in all fields.");
+            if (!email || !spend) return alert("Please fill in all fields.");
             if (parseFloat(spend) > 500) return alert("Maximum spend is £500.");
 
             try {
                 const res = await fetch('/api/admin/record-spend', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-admin-pin': adminPin },
-                    body: JSON.stringify({ phone, spend: parseFloat(spend) })
+                    body: JSON.stringify({ email, spend: parseFloat(spend) })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -201,7 +202,7 @@
                     closeModal();
                     fetchPending();
                     if (type === 'manual') {
-                        document.getElementById('manual-phone').value = '';
+                        document.getElementById('manual-email').value = '';
                         document.getElementById('manual-spend').value = '';
                     }
                 } else {

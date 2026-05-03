@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Check Rewards - The Restaurant</title>
+    <title>Customer Rewards Portal | Loyalty Programme</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <script src="https://www.google.com/recaptcha/api.js?render=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></script>
     <style>
         :root {
-            --cream: #F7F3EE;
-            --dark: #1A1410;
-            --ember: #C4531A;
+            --brand: #C4531A;
+            --brand-dark: #1A1410;
+            --bg: #F7F3EE;
+            --text: #1A1410;
             --muted: #6B6259;
-            --gold: #C8A84B;
-            --border: rgba(26, 20, 16, 0.12);
+            --border: rgba(26, 20, 16, 0.1);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'DM Sans', sans-serif;
-            background-color: var(--cream);
-            color: var(--dark);
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             max-width: 480px;
             margin: 0 auto;
             min-height: 100vh;
@@ -29,153 +29,207 @@
             flex-direction: column;
             padding: 40px 20px;
         }
-        h1 { font-family: 'Cormorant Garamond', serif; font-size: 32px; margin-bottom: 8px; text-align: center; }
-        p.subtitle { text-align: center; color: var(--muted); margin-bottom: 40px; }
-        
-        .card { background: white; border-radius: 20px; padding: 32px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.02); margin-bottom: 24px; }
-        
+        header { text-align: center; margin-bottom: 40px; padding-top: 20px; }
+        h1 { font-family: 'Playfair Display', serif; font-size: 32px; margin-bottom: 8px; }
+        .subtitle { color: var(--muted); font-size: 16px; }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 32px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+            margin-bottom: 24px;
+        }
+
         .form-group { margin-bottom: 24px; }
-        label { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; color: var(--muted); }
-        input { width: 100%; height: 56px; border: 1px solid var(--border); border-radius: 12px; padding: 0 16px; font-size: 18px; }
-        
-        button { width: 100%; height: 56px; background: var(--dark); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 500; cursor: pointer; }
-        
-        .status-display { display: none; }
-        .cust-name { font-family: 'Cormorant Garamond', serif; font-size: 36px; margin-bottom: 4px; }
-        .badge { display: inline-block; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 24px; }
-        .badge-none { background: #eee; color: #666; }
-        .badge-bronze { background: #CD7F32; color: white; }
-        .badge-silver { background: #C0C0C0; color: #333; }
-        .badge-gold { background: #FFD700; color: #333; }
-        .badge-vip { background: #1A1410; color: #C8A84B; }
-        
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-        .stat-box { background: #F9F7F5; padding: 16px; border-radius: 12px; }
-        .stat-box label { margin-bottom: 4px; font-size: 11px; }
-        .stat-box p { font-size: 20px; font-weight: 600; }
-        
-        .progress-container { margin-bottom: 24px; }
-        .progress-bar { height: 8px; background: #EEE9E4; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
-        .progress-fill { height: 100%; background: var(--ember); width: 0%; transition: width 1s ease-out; }
-        
-        .discount-box { background: #FFF8E1; border: 1px solid #FFE082; padding: 16px; border-radius: 12px; text-align: center; }
-        .discount-box p { font-size: 14px; font-weight: 600; color: #C4531A; }
-        
-        .footer { margin-top: auto; padding: 40px 0; text-align: center; font-size: 13px; color: var(--muted); }
-        .footer a { color: var(--muted); text-decoration: none; margin: 0 8px; }
-        
-        .error-view { display: none; text-align: center; padding: 40px 0; }
+        label { display: block; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; color: var(--muted); }
+        input {
+            width: 100%;
+            height: 60px;
+            border: 2px solid #EEEBE8;
+            border-radius: 16px;
+            padding: 0 20px;
+            font-size: 18px;
+            font-family: inherit;
+            transition: 0.3s;
+        }
+        input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px rgba(196, 83, 26, 0.08); }
+
+        .btn {
+            width: 100%;
+            height: 60px;
+            background: var(--brand-dark);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn:hover { background: #000; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .status-content { display: none; }
+        .cust-name { font-family: 'Playfair Display', serif; font-size: 32px; margin-bottom: 4px; }
+        .tier-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+        }
+        .tier-none { background: #F0EDE9; color: var(--muted); }
+        .tier-bronze { background: #FAF0E8; color: #A0673A; }
+        .tier-silver { background: #EEF1F4; color: #3A4F5E; }
+        .tier-gold { background: #FDF6E3; color: #C8A84B; }
+        .tier-vip { background: var(--brand-dark); color: #C8A84B; }
+
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .stat-box { background: #F9F7F5; padding: 20px; border-radius: 16px; border: 1px solid var(--border); }
+        .stat-box label { font-size: 11px; margin-bottom: 4px; }
+        .stat-box p { font-size: 22px; font-weight: 700; color: var(--brand-dark); }
+
+        .progress-section { margin: 32px 0; }
+        .progress-meta { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 10px; font-weight: 600; }
+        .bar-bg { height: 12px; background: #E8E4E0; border-radius: 6px; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--brand); width: 0%; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        .discount-highlight {
+            background: #FFF8F1;
+            border: 1px solid rgba(196, 83, 26, 0.15);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            color: var(--brand);
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        footer { margin-top: auto; padding: 40px 0; text-align: center; border-top: 1px solid var(--border); }
+        footer a { color: var(--muted); text-decoration: none; font-size: 14px; margin: 0 12px; transition: 0.2s; }
+        footer a:hover { color: var(--brand); }
+
+        .error-msg { text-align: center; padding: 40px 0; display: none; }
     </style>
 </head>
 <body>
+    <header>
+        <h1>Rewards Portal</h1>
+        <p class="subtitle">Check your loyalty status anytime</p>
+    </header>
+
     <div id="lookup-view">
-        <h1>Check your rewards</h1>
-        <p class="subtitle">Enter your phone number to see your loyalty status.</p>
-        
         <div class="card">
             <div class="form-group">
-                <label>Phone Number</label>
-                <input type="tel" id="phone" placeholder="+44 7700 900000">
+                <label>Email Address</label>
+                <input type="email" id="email" placeholder="Enter the email you used at check-in">
             </div>
-            <button id="btn-check">Check status &rarr;</button>
-            <p style="text-align: center; margin-top: 16px; font-size: 14px; color: var(--muted);">Not a member yet? Visit us and join at the till.</p>
+            <button class="btn" id="btn-check">View My Rewards &rarr;</button>
         </div>
+        <p style="text-align: center; font-size: 14px; color: var(--muted);">Scan the QR code at the restaurant to join.</p>
     </div>
 
-    <div id="status-view" class="status-display">
+    <div id="status-view" class="status-content">
         <div class="card">
-            <h2 id="display-name" class="cust-name">Name</h2>
-            <div id="display-badge" class="badge">Bronze Status</div>
+            <h2 id="disp-name" class="cust-name">John Doe</h2>
+            <div id="disp-badge" class="tier-badge">Bronze Status</div>
             
-            <div class="stat-grid">
+            <div class="stats">
                 <div class="stat-box">
                     <label>90-Day Spend</label>
-                    <p id="display-spend">£0.00</p>
+                    <p id="disp-spend">£0.00</p>
                 </div>
                 <div class="stat-box">
-                    <label>Total Visits</label>
-                    <p id="display-visits">0</p>
+                    <label>Visits</label>
+                    <p id="disp-visits">0</p>
                 </div>
             </div>
 
-            <div id="progress-area" class="progress-container">
-                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; color: var(--muted);">
-                    <span id="display-next-tier">Next: Silver</span>
-                    <span id="display-togo">£0 to go</span>
+            <div id="progress-area" class="progress-section">
+                <div class="progress-meta">
+                    <span id="disp-next">Next: Silver</span>
+                    <span id="disp-togo">£0 to go</span>
                 </div>
-                <div class="progress-bar">
-                    <div id="progress-fill" class="progress-fill"></div>
+                <div class="bar-bg">
+                    <div id="bar-fill" class="bar-fill"></div>
                 </div>
             </div>
 
-            <div class="discount-box">
-                <p id="display-discount">Your current discount: 0% off — mention this when ordering</p>
+            <div class="discount-highlight">
+                <span id="disp-discount">10% OFF</span> EVERY TIME
             </div>
             
-            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);">
-                <p>Member since: <span id="display-since">Date</span></p>
-                <p>Last visit: <span id="display-last">Date</span></p>
+            <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); line-height: 1.8;">
+                <p>Member Since: <span id="disp-since">--</span></p>
+                <p>Last Visit: <span id="disp-last">--</span></p>
             </div>
         </div>
-        <button onclick="location.reload()" style="background: transparent; color: var(--muted); text-decoration: underline;">Look up another number</button>
+        <button onclick="location.reload()" style="width: 100%; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 16px; height: 50px; cursor: pointer;">Look up another email</button>
     </div>
 
-    <div id="error-view" class="error-view">
-        <p style="margin-bottom: 16px;">We don't have an account for this number yet.</p>
-        <p style="font-weight: 500;">Visit us and check in at the till to join!</p>
-        <button onclick="location.reload()" style="margin-top: 32px; background: var(--ember);">Try again</button>
+    <div id="error-view" class="error-msg">
+        <p style="margin-bottom: 24px; font-size: 18px; font-weight: 600;">Account not found.</p>
+        <p style="color: var(--muted); margin-bottom: 32px;">Please check the email address or join us at the restaurant to start earning rewards.</p>
+        <button class="btn" onclick="location.reload()">Try Again</button>
     </div>
 
-    <div class="footer">
-        <a href="terms.html">Terms & Conditions</a>
-        <a href="terms.html">Privacy Policy</a>
-    </div>
+    <footer>
+        <a href="terms.html">Terms</a>
+        <a href="terms.html">Privacy</a>
+        <a href="mailto:loyalty@yourrestaurant.com">Support</a>
+    </footer>
 
     <script>
         const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
         document.getElementById('btn-check').addEventListener('click', () => {
-            const phone = document.getElementById('phone').value;
-            if (!phone) return alert("Please enter your phone number.");
+            const email = document.getElementById('email').value;
+            if (!email || !email.includes('@')) return alert("Please enter a valid email address.");
             
-            document.getElementById('btn-check').disabled = true;
+            const btn = document.getElementById('btn-check');
+            btn.disabled = true;
+            btn.innerText = "Verifying...";
 
             grecaptcha.ready(() => {
                 grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'status'}).then(async (token) => {
                     try {
-                        const res = await fetch(`/api/status?phone=${encodeURIComponent(phone)}&recaptcha_token=${token}`);
+                        const res = await fetch(`/api/status?email=${encodeURIComponent(email)}&recaptcha_token=${token}`);
                         const data = await res.json();
                         
                         if (data.found) {
                             document.getElementById('lookup-view').style.display = 'none';
                             document.getElementById('status-view').style.display = 'block';
                             
-                            document.getElementById('display-name').innerText = data.name;
-                            document.getElementById('display-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
-                            document.getElementById('display-badge').className = `badge badge-${data.tier}`;
-                            document.getElementById('display-spend').innerText = `£${data.spend90d.toFixed(2)}`;
-                            document.getElementById('display-visits').innerText = data.totalVisits;
-                            document.getElementById('display-discount').innerText = `Your current discount: ${data.discount}% off — mention this when ordering`;
-                            document.getElementById('display-since').innerText = data.consentDate;
-                            document.getElementById('display-last').innerText = data.lastVisit;
+                            document.getElementById('disp-name').innerText = data.name;
+                            document.getElementById('disp-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
+                            document.getElementById('disp-badge').className = `tier-badge tier-${data.tier}`;
+                            document.getElementById('disp-spend').innerText = `£${data.spend90d.toFixed(2)}`;
+                            document.getElementById('disp-visits').innerText = data.totalVisits;
+                            document.getElementById('disp-discount').innerText = `${data.discount}% OFF`;
+                            document.getElementById('disp-since').innerText = data.consentDate;
+                            document.getElementById('disp-last').innerText = data.lastVisit;
 
                             if (data.tier === 'vip') {
                                 document.getElementById('progress-area').style.display = 'none';
                             } else {
-                                document.getElementById('display-next-tier').innerText = `Next: ${data.nextTier.toUpperCase()}`;
-                                document.getElementById('display-togo').innerText = `£${(data.nextThreshold - data.spend90d).toFixed(2)} to go`;
+                                document.getElementById('disp-next').innerText = `Next: ${data.nextTier.toUpperCase()}`;
+                                document.getElementById('disp-togo').innerText = `£${(data.nextThreshold - data.spend90d).toFixed(2)} to go`;
                                 setTimeout(() => {
-                                    document.getElementById('progress-fill').style.width = `${data.progressPercent}%`;
-                                }, 100);
+                                    document.getElementById('bar-fill').style.width = `${data.progressPercent}%`;
+                                }, 200);
                             }
                         } else {
                             document.getElementById('lookup-view').style.display = 'none';
                             document.getElementById('error-view').style.display = 'block';
                         }
                     } catch (err) {
-                        alert("Verification failed. Please try again.");
-                    } finally {
-                        document.getElementById('btn-check').disabled = false;
+                        alert("Lookup failed. Please check your connection.");
+                        btn.disabled = false;
+                        btn.innerText = "View My Rewards →";
                     }
                 });
             });

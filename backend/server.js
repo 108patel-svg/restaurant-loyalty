@@ -398,37 +398,34 @@ app.post('/api/send-code', visitLimiter, async (req, res) => {
 });
 
 app.post('/api/checkin', visitLimiter, async (req, res) => {
-  let { name, phone, email, marketing_consent, code, recaptcha_token } = req.body;
+  let { name, email, phone, marketing_consent, recaptcha_token } = req.body;
 
   if (!await verifyRecaptcha(recaptcha_token)) {
     return res.status(403).json({ error: "Bot verification failed." });
   }
 
-  // Verify code
-  const entry = verificationCodes.get(phone);
-  if (!entry || entry.code !== code || entry.expires < Date.now()) {
-    return res.status(400).json({ error: "Invalid or expired verification code." });
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: "A valid email address is required." });
   }
-  verificationCodes.delete(phone);
 
   try {
     const s = await getSettings();
-    phone = phone.trim();
+    email = email.trim().toLowerCase();
     name = name.trim();
-    email = email ? email.trim().toLowerCase() : null;
+    phone = phone ? phone.trim() : null;
 
-    // Upsert customer by phone
+    // Upsert customer by email
     const custRes = await pool.query(
-      `INSERT INTO customers (name, phone, email, marketing_consent, consent_date, consent_ip) 
+      `INSERT INTO customers (name, email, phone, marketing_consent, consent_date, consent_ip) 
        VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN NOW() ELSE NULL END, CASE WHEN $4 THEN $5 ELSE NULL END)
-       ON CONFLICT (phone) DO UPDATE SET 
+       ON CONFLICT (email) DO UPDATE SET 
          name = EXCLUDED.name,
-         email = COALESCE(EXCLUDED.email, customers.email),
+         phone = COALESCE(EXCLUDED.phone, customers.phone),
          marketing_consent = CASE WHEN EXCLUDED.marketing_consent THEN TRUE ELSE customers.marketing_consent END,
          consent_date = CASE WHEN EXCLUDED.marketing_consent AND NOT customers.marketing_consent THEN NOW() ELSE customers.consent_date END,
          consent_ip = CASE WHEN EXCLUDED.marketing_consent AND NOT customers.marketing_consent THEN $5 ELSE customers.consent_ip END
        RETURNING id, name, current_tier, created_at`,
-      [name, phone, email, !!marketing_consent, req.ip]
+      [name, email, phone, !!marketing_consent, req.ip]
     );
     const customer = custRes.rows[0];
 
@@ -462,15 +459,17 @@ app.post('/api/checkin', visitLimiter, async (req, res) => {
 });
 
 app.get('/api/status', async (req, res) => {
-  const { phone, recaptcha_token } = req.query;
+  const { email, recaptcha_token } = req.query;
 
   if (!await verifyRecaptcha(recaptcha_token)) {
     return res.status(403).json({ error: "Bot verification failed." });
   }
 
+  if (!email) return res.status(400).json({ error: "Email is required." });
+
   try {
     const s = await getSettings();
-    const cRes = await pool.query('SELECT * FROM customers WHERE phone = $1', [phone]);
+    const cRes = await pool.query('SELECT * FROM customers WHERE email = $1', [email.trim().toLowerCase()]);
     if (cRes.rowCount === 0) {
       return res.json({ found: false });
     }
@@ -526,7 +525,7 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/admin/pending-checkins', adminLimiter, checkAdmin, async (req, res) => {
   try {
     const q = `
-      SELECT c.name, c.phone, c.current_tier as tier, p.checked_in_at, c.id as customer_id
+      SELECT c.name, c.email, c.current_tier as tier, p.checked_in_at, c.id as customer_id
       FROM pending_checkins p
       JOIN customers c ON p.customer_id = c.id
       WHERE p.spend_recorded = FALSE AND p.checked_in_at >= CURRENT_DATE
@@ -543,14 +542,14 @@ app.get('/api/admin/pending-checkins', adminLimiter, checkAdmin, async (req, res
 });
 
 app.post('/api/admin/record-spend', adminLimiter, checkAdmin, async (req, res) => {
-  let { phone, spend } = req.body;
+  let { email, spend } = req.body;
   spend = parseFloat(spend);
   if (isNaN(spend) || spend <= 0 || spend > 500) {
     return res.status(400).json({ error: "Invalid spend amount (max £500)." });
   }
 
   try {
-    const cRes = await pool.query('SELECT id, name, current_tier, email FROM customers WHERE phone = $1', [phone]);
+    const cRes = await pool.query('SELECT id, name, current_tier, email FROM customers WHERE email = $1', [email.trim().toLowerCase()]);
     if (cRes.rowCount === 0) return res.status(404).json({ error: "Customer not found." });
     const customer = cRes.rows[0];
 
