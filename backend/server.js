@@ -63,12 +63,17 @@ const statusLimiter = rateLimit({
 // Emails
 async function sendEmail(to, subject, text, html) {
   const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) {
-    console.warn('[EMAIL] No SendGrid API key found. Skipping email.');
+  const fromEmail = process.env.RESTAURANT_EMAIL;
+  
+  console.log(`[EMAIL] Attempting to send to ${to}. (Using Sender: ${fromEmail || 'MISSING'})`);
+
+  if (!apiKey || !fromEmail) {
+    console.error('[EMAIL] CRITICAL: Missing SENDGRID_API_KEY or RESTAURANT_EMAIL in environment variables.');
     return;
   }
+
   try {
-    await fetch('https://api.sendgrid.com/v3/mail/send', {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -76,7 +81,7 @@ async function sendEmail(to, subject, text, html) {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: to }] }],
-        from: { email: process.env.RESTAURANT_EMAIL || 'loyalty@yourrestaurant.com' },
+        from: { email: fromEmail },
         subject: subject,
         content: [
           { type: 'text/plain', value: text + '\n\nUnsubscribe: ' + (process.env.PUBLIC_URL || 'http://localhost:3000') + '/public/' },
@@ -88,9 +93,15 @@ async function sendEmail(to, subject, text, html) {
         asm: process.env.SENDGRID_UNSUBSCRIBE_GROUP_ID ? { group_id: parseInt(process.env.SENDGRID_UNSUBSCRIBE_GROUP_ID) } : undefined
       })
     });
-    console.log(`[EMAIL] Sent: ${subject} to ${to}`);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[EMAIL] SendGrid Rejected Request (Status ${response.status}):`, errText);
+    } else {
+      console.log(`[EMAIL] Successfully delivered to SendGrid queue: ${subject}`);
+    }
   } catch (err) {
-    console.error('[EMAIL] Failed to send email:', err.message);
+    console.error('[EMAIL] System/Network Error:', err.message);
   }
 }
 
