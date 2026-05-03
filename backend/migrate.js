@@ -34,7 +34,8 @@ async function migrate() {
           retention_discount REAL DEFAULT 10,
           frequency_visits INTEGER DEFAULT 3,
           frequency_days INTEGER DEFAULT 60,
-          frequency_discount REAL DEFAULT 10
+          frequency_discount REAL DEFAULT 10,
+          tier_window_days INTEGER DEFAULT 90
         )
       `);
 
@@ -110,7 +111,8 @@ async function migrate() {
     retention_discount REAL DEFAULT 10,
     frequency_visits INTEGER DEFAULT 3,
     frequency_days INTEGER DEFAULT 60,
-    frequency_discount REAL DEFAULT 10
+    frequency_discount REAL DEFAULT 10,
+    tier_window_days INTEGER DEFAULT 90
   )`);
 
   // Ensure 1 row exists

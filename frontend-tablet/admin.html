@@ -618,6 +618,7 @@
                         <div class="form-row"><label>Silver</label><input type="number" id="set-t-silver"></div>
                         <div class="form-row"><label>Gold</label><input type="number" id="set-t-gold"></div>
                         <div class="form-row"><label>VIP</label><input type="number" id="set-t-vip"></div>
+                        <div class="form-row"><label>Review Period (days)</label><input type="number" id="set-t-window"></div>
                     </div>
 
                     <div class="settings-card">
@@ -738,6 +739,7 @@
                 s.frequencyVisits = Number(document.getElementById("set-f-count").value);
                 s.frequencyDays = Number(document.getElementById("set-f-days").value);
                 s.frequencyDiscount = Number(document.getElementById("set-f-disc").value);
+                s.tierWindowDays = Number(document.getElementById("set-t-window").value);
 
                 try {
                     await App.saveSettingsData(s);
@@ -772,6 +774,7 @@
                     document.getElementById("set-f-count").value = s.frequency_visits;
                     document.getElementById("set-f-days").value = s.frequency_days;
                     document.getElementById("set-f-disc").value = s.frequency_discount;
+                    document.getElementById("set-t-window").value = s.tier_window_days;
 
                     const stats = await App.getAdminStats();
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
