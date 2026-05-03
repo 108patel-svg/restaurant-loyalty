@@ -11,7 +11,8 @@ async function migrate() {
       CREATE TABLE IF NOT EXISTS customers (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
+        phone TEXT UNIQUE,
+        email TEXT UNIQUE,
         current_tier TEXT NOT NULL DEFAULT 'none',
         unsubscribed BOOLEAN NOT NULL DEFAULT FALSE,
         marketing_consent BOOLEAN NOT NULL DEFAULT FALSE,
@@ -23,6 +24,7 @@ async function migrate() {
 
         // For existing databases: add the column if it doesn't exist yet
         await pool.query(`
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT UNIQUE;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS consent_date TIMESTAMPTZ;
@@ -62,6 +64,17 @@ async function migrate() {
 
         await pool.query(`
       INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+    `);
+
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS pending_checkins (
+        id           SERIAL PRIMARY KEY,
+        customer_id  INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        checked_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        spend_recorded BOOLEAN NOT NULL DEFAULT FALSE,
+        spend_recorded_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_pending_phone ON pending_checkins(customer_id);
     `);
 
         console.log("✓ Tables created");

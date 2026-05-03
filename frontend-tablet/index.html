@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loyalty Check-in - The Restaurant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://www.google.com/recaptcha/api.js?render=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></script>
+    <style>
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --muted: #6B6259;
+            --gold: #C8A84B;
+            --border: rgba(26, 20, 16, 0.12);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            color: var(--dark);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-size: 18px;
+        }
+        .container {
+            background: rgba(247, 243, 238, 0.95);
+            backdrop-filter: blur(10px);
+            width: 100%;
+            max-width: 600px;
+            padding: 48px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 42px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        p.subtitle {
+            color: var(--muted);
+            margin-bottom: 40px;
+        }
+        .form-group {
+            text-align: left;
+            margin-bottom: 24px;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+            color: var(--muted);
+        }
+        input {
+            width: 100%;
+            height: 64px;
+            padding: 0 24px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 20px;
+            font-family: inherit;
+            background: white;
+            transition: all 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--ember);
+            box-shadow: 0 0 0 4px rgba(196, 83, 26, 0.1);
+        }
+        .consent-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 24px 0;
+            cursor: pointer;
+        }
+        .consent-row input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            margin-top: 4px;
+            accent-color: var(--ember);
+        }
+        .consent-text {
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .consent-sub {
+            font-size: 13px;
+            color: var(--muted);
+            display: block;
+            margin-top: 4px;
+        }
+        .terms-line {
+            font-size: 14px;
+            color: var(--muted);
+            margin-top: 32px;
+        }
+        .terms-line a {
+            color: var(--ember);
+            text-decoration: none;
+        }
+        button {
+            width: 100%;
+            height: 64px;
+            background: var(--dark);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 16px;
+        }
+        button:hover { background: #000; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .step { display: none; }
+        .step.active { display: block; }
+        
+        #view-thanks h2 { font-family: 'Cormorant Garamond', serif; font-size: 48px; margin-bottom: 16px; }
+        .badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: 600; text-transform: uppercase; font-size: 14px; margin-bottom: 16px; }
+        .badge-none { background: #eee; color: #666; }
+        .badge-bronze { background: #CD7F32; color: white; }
+        .badge-silver { background: #C0C0C0; color: #333; }
+        .badge-gold { background: #FFD700; color: #333; }
+        .badge-vip { background: #1A1410; color: #C8A84B; border: 1px solid #C8A84B; }
+        
+        #timer-text { font-size: 12px; color: var(--muted); margin-top: 40px; }
+        .error-msg { color: var(--ember); font-size: 14px; margin-top: 8px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- STEP 1: Form -->
+        <div id="step-1" class="step active">
+            <h1>Loyalty Rewards</h1>
+            <p class="subtitle" id="restaurant-name">The Restaurant</p>
+            
+            <form id="checkin-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="name" required autocomplete="name" placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" id="phone" required autocomplete="tel" placeholder="+44 7700 900000">
+                </div>
+                <div class="form-group">
+                    <label>Email address (optional)</label>
+                    <input type="email" id="email" autocomplete="email" placeholder="For reward notifications">
+                </div>
+                
+                <div id="marketing-container" style="display: none;">
+                    <label class="consent-row">
+                        <input type="checkbox" id="marketing_consent">
+                        <span class="consent-text">
+                            I'd like to receive exclusive rewards, offers, and loyalty updates by email.
+                            <span class="consent-sub">You can unsubscribe at any time. We never share your data.</span>
+                        </span>
+                    </label>
+                </div>
+                
+                <p class="terms-line">By continuing, you agree to our <a href="terms.html" target="_blank">Terms & Conditions</a> and <a href="terms.html" target="_blank">Privacy Policy</a>.</p>
+                
+                <button type="submit" id="btn-next">Next &rarr;</button>
+            </form>
+        </div>
+
+        <!-- STEP 2: Verification -->
+        <div id="step-2" class="step">
+            <h1>Verify Phone</h1>
+            <p class="subtitle">Enter the 6-digit code we sent to your phone.</p>
+            
+            <div class="form-group">
+                <input type="text" id="verification-code" placeholder="••••••" maxlength="6" style="text-align: center; font-size: 32px; letter-spacing: 0.5em;">
+                <p id="verify-error" class="error-msg">Invalid code. Please try again.</p>
+            </div>
+            
+            <button id="btn-verify">Verify &rarr;</button>
+            <p style="margin-top: 24px; font-size: 14px;"><a href="#" id="btn-resend" style="color: var(--muted);">Didn't get a code? Resend</a></p>
+        </div>
+
+        <!-- STEP 3: Success -->
+        <div id="view-thanks" class="step">
+            <h2 id="thanks-name">Thank you, Name!</h2>
+            <div id="thanks-badge" class="badge">None Status</div>
+            <p id="thanks-discount" style="font-size: 24px; font-weight: 500; color: var(--ember); margin-bottom: 16px;">You have 10% off today</p>
+            <p class="subtitle">Please pay at the till. The cashier will record your spend.</p>
+            
+            <button id="btn-reset" style="background: var(--ember);">Next customer &rarr;</button>
+            
+            <p id="timer-text">Resetting in 60 seconds...</p>
+        </div>
+    </div>
+
+    <script>
+        const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+        
+        let resetTimer;
+        let timeLeft = 60;
+
+        function startResetTimer() {
+            timeLeft = 60;
+            clearInterval(resetTimer);
+            resetTimer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-text').innerText = `Resetting in ${timeLeft} seconds...`;
+                if (timeLeft <= 0) {
+                    resetForm();
+                }
+            }, 1000);
+        }
+
+        function resetForm() {
+            clearInterval(resetTimer);
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step-1').classList.add('active');
+            document.getElementById('checkin-form').reset();
+            document.getElementById('marketing-container').style.display = 'none';
+            document.getElementById('verify-error').style.display = 'none';
+            document.getElementById('btn-next').disabled = false;
+        }
+
+        document.getElementById('email').addEventListener('input', (e) => {
+            document.getElementById('marketing-container').style.display = e.target.value.includes('@') ? 'block' : 'none';
+        });
+
+        document.getElementById('checkin-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const phone = document.getElementById('phone').value;
+            document.getElementById('btn-next').disabled = true;
+
+            grecaptcha.ready(() => {
+                grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'sendcode'}).then(async (token) => {
+                    const res = await fetch('/api/send-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone, recaptcha_token: token })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        document.getElementById('step-1').classList.remove('active');
+                        document.getElementById('step-2').classList.add('active');
+                    } else {
+                        alert(data.error || "Failed to send code.");
+                        document.getElementById('btn-next').disabled = false;
+                    }
+                });
+            });
+        });
+
+        document.getElementById('btn-verify').addEventListener('click', async () => {
+            const phone = document.getElementById('phone').value;
+            const code = document.getElementById('verification-code').value;
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const marketing_consent = document.getElementById('marketing_consent').checked;
+            
+            document.getElementById('btn-verify').disabled = true;
+
+            grecaptcha.ready(() => {
+                grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'checkin'}).then(async (token) => {
+                    const res = await fetch('/api/checkin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, phone, email, marketing_consent, code, recaptcha_token: token })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        document.getElementById('step-2').classList.remove('active');
+                        document.getElementById('view-thanks').classList.add('active');
+                        document.getElementById('thanks-name').innerText = `Thank you, ${data.name}!`;
+                        document.getElementById('thanks-badge').innerText = `${data.tier.toUpperCase()} Status`;
+                        document.getElementById('thanks-badge').className = `badge badge-${data.tier}`;
+                        document.getElementById('thanks-discount').innerText = `You have ${data.discount}% off today`;
+                        startResetTimer();
+                    } else {
+                        document.getElementById('verify-error').style.display = 'block';
+                        document.getElementById('btn-verify').disabled = false;
+                    }
+                });
+            });
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', resetForm);
+    </script>
+</body>
+</html>

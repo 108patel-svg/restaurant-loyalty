@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Rewards - The Restaurant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://www.google.com/recaptcha/api.js?render=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></script>
+    <style>
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --muted: #6B6259;
+            --gold: #C8A84B;
+            --border: rgba(26, 20, 16, 0.12);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--dark);
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 40px 20px;
+        }
+        h1 { font-family: 'Cormorant Garamond', serif; font-size: 32px; margin-bottom: 8px; text-align: center; }
+        p.subtitle { text-align: center; color: var(--muted); margin-bottom: 40px; }
+        
+        .card { background: white; border-radius: 20px; padding: 32px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.02); margin-bottom: 24px; }
+        
+        .form-group { margin-bottom: 24px; }
+        label { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; color: var(--muted); }
+        input { width: 100%; height: 56px; border: 1px solid var(--border); border-radius: 12px; padding: 0 16px; font-size: 18px; }
+        
+        button { width: 100%; height: 56px; background: var(--dark); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 500; cursor: pointer; }
+        
+        .status-display { display: none; }
+        .cust-name { font-family: 'Cormorant Garamond', serif; font-size: 36px; margin-bottom: 4px; }
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 24px; }
+        .badge-none { background: #eee; color: #666; }
+        .badge-bronze { background: #CD7F32; color: white; }
+        .badge-silver { background: #C0C0C0; color: #333; }
+        .badge-gold { background: #FFD700; color: #333; }
+        .badge-vip { background: #1A1410; color: #C8A84B; }
+        
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .stat-box { background: #F9F7F5; padding: 16px; border-radius: 12px; }
+        .stat-box label { margin-bottom: 4px; font-size: 11px; }
+        .stat-box p { font-size: 20px; font-weight: 600; }
+        
+        .progress-container { margin-bottom: 24px; }
+        .progress-bar { height: 8px; background: #EEE9E4; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+        .progress-fill { height: 100%; background: var(--ember); width: 0%; transition: width 1s ease-out; }
+        
+        .discount-box { background: #FFF8E1; border: 1px solid #FFE082; padding: 16px; border-radius: 12px; text-align: center; }
+        .discount-box p { font-size: 14px; font-weight: 600; color: #C4531A; }
+        
+        .footer { margin-top: auto; padding: 40px 0; text-align: center; font-size: 13px; color: var(--muted); }
+        .footer a { color: var(--muted); text-decoration: none; margin: 0 8px; }
+        
+        .error-view { display: none; text-align: center; padding: 40px 0; }
+    </style>
+</head>
+<body>
+    <div id="lookup-view">
+        <h1>Check your rewards</h1>
+        <p class="subtitle">Enter your phone number to see your loyalty status.</p>
+        
+        <div class="card">
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" id="phone" placeholder="+44 7700 900000">
+            </div>
+            <button id="btn-check">Check status &rarr;</button>
+            <p style="text-align: center; margin-top: 16px; font-size: 14px; color: var(--muted);">Not a member yet? Visit us and join at the till.</p>
+        </div>
+    </div>
+
+    <div id="status-view" class="status-display">
+        <div class="card">
+            <h2 id="display-name" class="cust-name">Name</h2>
+            <div id="display-badge" class="badge">Bronze Status</div>
+            
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <label>90-Day Spend</label>
+                    <p id="display-spend">£0.00</p>
+                </div>
+                <div class="stat-box">
+                    <label>Total Visits</label>
+                    <p id="display-visits">0</p>
+                </div>
+            </div>
+
+            <div id="progress-area" class="progress-container">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; color: var(--muted);">
+                    <span id="display-next-tier">Next: Silver</span>
+                    <span id="display-togo">£0 to go</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="discount-box">
+                <p id="display-discount">Your current discount: 0% off — mention this when ordering</p>
+            </div>
+            
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);">
+                <p>Member since: <span id="display-since">Date</span></p>
+                <p>Last visit: <span id="display-last">Date</span></p>
+            </div>
+        </div>
+        <button onclick="location.reload()" style="background: transparent; color: var(--muted); text-decoration: underline;">Look up another number</button>
+    </div>
+
+    <div id="error-view" class="error-view">
+        <p style="margin-bottom: 16px;">We don't have an account for this number yet.</p>
+        <p style="font-weight: 500;">Visit us and check in at the till to join!</p>
+        <button onclick="location.reload()" style="margin-top: 32px; background: var(--ember);">Try again</button>
+    </div>
+
+    <div class="footer">
+        <a href="terms.html">Terms & Conditions</a>
+        <a href="terms.html">Privacy Policy</a>
+    </div>
+
+    <script>
+        const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+
+        document.getElementById('btn-check').addEventListener('click', () => {
+            const phone = document.getElementById('phone').value;
+            if (!phone) return alert("Please enter your phone number.");
+            
+            document.getElementById('btn-check').disabled = true;
+
+            grecaptcha.ready(() => {
+                grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'status'}).then(async (token) => {
+                    try {
+                        const res = await fetch(`/api/status?phone=${encodeURIComponent(phone)}&recaptcha_token=${token}`);
+                        const data = await res.json();
+                        
+                        if (data.found) {
+                            document.getElementById('lookup-view').style.display = 'none';
+                            document.getElementById('status-view').style.display = 'block';
+                            
+                            document.getElementById('display-name').innerText = data.name;
+                            document.getElementById('display-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
+                            document.getElementById('display-badge').className = `badge badge-${data.tier}`;
+                            document.getElementById('display-spend').innerText = `£${data.spend90d.toFixed(2)}`;
+                            document.getElementById('display-visits').innerText = data.totalVisits;
+                            document.getElementById('display-discount').innerText = `Your current discount: ${data.discount}% off — mention this when ordering`;
+                            document.getElementById('display-since').innerText = data.consentDate;
+                            document.getElementById('display-last').innerText = data.lastVisit;
+
+                            if (data.tier === 'vip') {
+                                document.getElementById('progress-area').style.display = 'none';
+                            } else {
+                                document.getElementById('display-next-tier').innerText = `Next: ${data.nextTier.toUpperCase()}`;
+                                document.getElementById('display-togo').innerText = `£${(data.nextThreshold - data.spend90d).toFixed(2)} to go`;
+                                setTimeout(() => {
+                                    document.getElementById('progress-fill').style.width = `${data.progressPercent}%`;
+                                }, 100);
+                            }
+                        } else {
+                            document.getElementById('lookup-view').style.display = 'none';
+                            document.getElementById('error-view').style.display = 'block';
+                        }
+                    } catch (err) {
+                        alert("Verification failed. Please try again.");
+                    } finally {
+                        document.getElementById('btn-check').disabled = false;
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

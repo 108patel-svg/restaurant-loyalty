@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Admin - Loyalty Rewards</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --ember-light: #E8703A;
+            --gold: #B8924A;
+            --silver-col: #8E9BA8;
+            --bronze-col: #A0673A;
+            --muted: #6B6259;
+            --border: rgba(26, 20, 16, 0.12);
+            --bg-light: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--dark);
+            min-height: 100vh;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 500;
+        }
+
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .card {
+            background-color: var(--bg-light);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.03);
+            width: 100%;
+            max-width: 360px;
+            padding: 32px 24px;
+        }
+
+        input {
+            width: 100%;
+            height: 48px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background-color: var(--cream);
+            padding: 0 16px;
+            font-family: inherit;
+            font-size: 15px;
+            color: var(--dark);
+            transition: all 0.2s ease;
+            outline: none;
+            margin-bottom: 16px;
+        }
+
+        input:focus {
+            border-color: var(--ember);
+            box-shadow: 0 0 0 3px rgba(196, 83, 26, 0.1);
+        }
+
+        button.primary {
+            width: 100%;
+            height: 48px;
+            background-color: var(--ember);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button.primary:hover {
+            background-color: var(--ember-light);
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .alert-error {
+            background: #FEECEB;
+            color: #B3261E;
+            border: 1px solid #F9DEDC;
+        }
+
+        .alert-success {
+            background: #E8F5E9;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+        }
+
+        .navbar {
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-brand {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            color: var(--dark);
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .nav-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            background: var(--bg-light);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 16px 20px;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+
+        .tab.active {
+            color: var(--dark);
+            border-bottom-color: var(--ember);
+        }
+
+        .dashboard-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .metric-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 500;
+        }
+
+        .tier-breakdown {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .tier-breakdown h3 {
+            margin-bottom: 16px;
+            font-size: 1.25rem;
+        }
+
+        .tier-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .tier-stat {
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .tier-stat .count {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            border-radius: 999px;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            padding: 4px 10px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .badge-none {
+            background: #F0EDE9;
+            color: #6B6259;
+            border: 1px solid transparent;
+        }
+
+        .badge-bronze {
+            background: #FAF0E8;
+            color: #7A3F1A;
+            border: 1px solid #D4976A;
+        }
+
+        .badge-silver {
+            background: #EEF1F4;
+            color: #3A4F5E;
+            border: 1px solid #8E9BA8;
+        }
+
+        .badge-gold {
+            background: #FDF6E3;
+            color: #6B4A10;
+            border: 1px solid #C8A84B;
+        }
+
+        .badge-vip {
+            background: #1A1410;
+            color: #C8A84B;
+            border: 1px solid #8A6A20;
+        }
+
+        .table-container {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 500;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: rgba(0, 0, 0, 0.01);
+        }
+
+        .customer-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .customer-email {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .list-container {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .list-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .list-row:last-child {
+            border-bottom: none;
+        }
+
+        .list-left .name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .list-left .date {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .list-right {
+            text-align: right;
+        }
+
+        .list-right .spend {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .search-wrapper {
+            margin-bottom: 16px;
+        }
+
+        .search-wrapper input {
+            width: 100%;
+            max-width: 400px;
+            background: var(--bg-light);
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .settings-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .settings-card h3 {
+            margin-bottom: 16px;
+            font-size: 1.25rem;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 600;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .form-row label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .form-row input {
+            width: 120px;
+            margin-bottom: 0;
+        }
+
+        .settings-card .primary {
+            margin-top: 16px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="view-login" class="login-container">
+        <div class="card">
+            <h2 style="text-align:center; margin-bottom:24px;">Staff access</h2>
+            <div id="login-alert"></div>
+            <form id="login-form">
+                <input type="password" id="pin-input" placeholder="Enter PIN (Default 1234)" autofocus>
+                <button type="submit" class="primary">Log in</button>
+            </form>
+            <div style="text-align: center; margin-top: 24px;">
+                <a href="index.html" style="font-size: 12px; color: var(--muted); text-decoration: none;">← Back to
+                    check-in</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-dashboard" style="display: none;">
+        <nav class="navbar">
+            <div class="nav-brand" id="nav-restaurant-name">The Restaurant</div>
+            <div class="nav-actions">
+                <a href="index.html" class="nav-btn">← Customer form</a>
+                <button class="nav-btn" id="btn-export">Export CSV</button>
+                <button class="nav-btn" id="btn-logout">Log out</button>
+            </div>
+        </nav>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="tab-overview">Overview</button>
+            <button class="tab" data-tab="tab-customers">Customers</button>
+            <button class="tab" data-tab="tab-activity">Recent activity</button>
+            <button class="tab" data-tab="tab-settings">Settings</button>
+        </div>
+
+        <main class="dashboard-content">
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="tab-pane active">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <span class="metric-label">Total customers</span>
+                        <span class="metric-value" id="stat-total-cust">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Checked in today</span>
+                        <span class="metric-value" id="stat-today-cust">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Active (Last 90 days)</span>
+                        <span class="metric-value" id="stat-active">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">90-Day Revenue</span>
+                        <span class="metric-value" id="stat-revenue">£0.00</span>
+                    </div>
+                </div>
+
+                <div class="tier-breakdown">
+                    <h3>Tier breakdown</h3>
+                    <div class="tier-grid">
+                        <div class="tier-stat">
+                            <div class="count" id="count-vip">0</div>
+                            <div class="badge badge-vip">VIP</div>
+                        </div>
+                        <div class="tier-stat">
+                            <div class="count" id="count-gold">0</div>
+                            <div class="badge badge-gold">GOLD</div>
+                        </div>
+                        <div class="tier-stat">
+                            <div class="count" id="count-silver">0</div>
+                            <div class="badge badge-silver">SILVER</div>
+                        </div>
+                        <div class="tier-stat">
+                            <div class="count" id="count-bronze">0</div>
+                            <div class="badge badge-bronze">BRONZE</div>
+                        </div>
+                        <div class="tier-stat">
+                            <div class="count" id="count-none">0</div>
+                            <div class="badge badge-none">NO TIER</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customers Tab -->
+            <div id="tab-customers" class="tab-pane">
+                <div class="search-wrapper">
+                    <input type="text" id="search-input" placeholder="Search by name or email...">
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Tier</th>
+                                <th>Visits</th>
+                                <th>90-Day Spend</th>
+                                <th>Marketing</th>
+                                <th>Member Since</th>
+                                <th style="width: 100px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-tbody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Activity Tab -->
+            <div id="tab-activity" class="tab-pane">
+                <div class="list-container" id="activity-list">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="tab-settings" class="tab-pane">
+                <div id="settings-alert"></div>
+                <div class="settings-grid">
+                    <div class="settings-card">
+                        <h3>General</h3>
+                        <div class="form-row">
+                            <label>Restaurant Name</label>
+                            <input type="text" id="set-name" style="width: 200px;">
+                        </div>
+                        <div class="form-row">
+                            <label>Admin PIN (leave blank to keep)</label>
+                            <input type="password" id="set-pin" style="width: 200px;" placeholder="****">
+                        </div>
+
+                        <h3 style="margin-top: 32px;">Thresholds (£ in 90 days)</h3>
+                        <div class="form-row"><label>Bronze</label><input type="number" id="set-t-bronze"></div>
+                        <div class="form-row"><label>Silver</label><input type="number" id="set-t-silver"></div>
+                        <div class="form-row"><label>Gold</label><input type="number" id="set-t-gold"></div>
+                        <div class="form-row"><label>VIP</label><input type="number" id="set-t-vip"></div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>Discounts (%)</h3>
+                        <div class="form-row"><label>New Customer</label><input type="number" id="set-d-new"></div>
+                        <div class="form-row"><label>Bronze</label><input type="number" id="set-d-bronze"></div>
+                        <div class="form-row"><label>Silver</label><input type="number" id="set-d-silver"></div>
+                        <div class="form-row"><label>Gold</label><input type="number" id="set-d-gold"></div>
+                        <div class="form-row"><label>VIP</label><input type="number" id="set-d-vip"></div>
+
+                        <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            let inactivityTimer;
+            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+            function resetInactivityTimer() {
+                clearTimeout(inactivityTimer);
+                if (document.getElementById("view-dashboard").style.display === "block") {
+                    inactivityTimer = setTimeout(() => {
+                        document.getElementById("btn-logout").click();
+                        App.setAlert("login-alert", "You have been logged out due to inactivity", "error");
+                    }, INACTIVITY_TIMEOUT);
+                }
+            }
+
+            ['click', 'touchstart', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
+                document.addEventListener(evt, resetInactivityTimer);
+            });
+
+            document.getElementById("login-form").addEventListener("submit", async (e) => {
+                e.preventDefault(); // Always prevent default at the very start
+                try {
+                    const pinInput = document.getElementById("pin-input");
+                    const pin = pinInput.value;
+                    if (App.checkAdminPin(pin)) {
+                        document.getElementById("view-login").style.display = "none";
+                        document.getElementById("view-dashboard").style.display = "block";
+                        await loadDashboard();
+                        resetInactivityTimer();
+                    } else {
+                        App.setAlert("login-alert", "Incorrect PIN", "error");
+                        pinInput.value = "";
+                    }
+                } catch (err) {
+                    console.error("Login submission error:", err);
+                    App.setAlert("login-alert", "System error. Please try again.", "error");
+                }
+            });
+
+            document.querySelectorAll(".tab").forEach(tab => {
+                tab.addEventListener("click", () => {
+                    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+                    tab.classList.add("active");
+                    document.getElementById(tab.dataset.tab).classList.add("active");
+
+                    if (tab.dataset.tab === "tab-customers") renderCustomers();
+                });
+            });
+
+            document.getElementById("btn-logout").addEventListener("click", () => {
+                document.getElementById("view-dashboard").style.display = "none";
+                document.getElementById("view-login").style.display = "flex";
+                document.getElementById("pin-input").value = "";
+            });
+
+            document.getElementById("btn-export").addEventListener("click", () => {
+                App.exportCSV();
+            });
+
+            document.getElementById("search-input").addEventListener("input", async () => {
+                await renderCustomers();
+            });
+
+            document.getElementById("btn-save-settings").addEventListener("click", () => {
+                const s = App.getSettings();
+                const name = document.getElementById("set-name").value.trim();
+                const pin = document.getElementById("set-pin").value.trim();
+
+                s.restaurant_name = name || s.restaurant_name;
+                if (pin && pin.length >= 4) s.admin_pin = pin;
+
+                s.bronze_threshold = Number(document.getElementById("set-t-bronze").value);
+                s.silver_threshold = Number(document.getElementById("set-t-silver").value);
+                s.gold_threshold = Number(document.getElementById("set-t-gold").value);
+                s.vip_threshold = Number(document.getElementById("set-t-vip").value);
+
+                s.discount_new = Number(document.getElementById("set-d-new").value);
+                s.discount_bronze = Number(document.getElementById("set-d-bronze").value);
+                s.discount_silver = Number(document.getElementById("set-d-silver").value);
+                s.discount_gold = Number(document.getElementById("set-d-gold").value);
+                s.discount_vip = Number(document.getElementById("set-d-vip").value);
+
+                App.saveSettingsData(s);
+                App.setAlert("settings-alert", "Settings saved successfully", "success");
+                document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
+                document.getElementById("set-pin").value = "";
+            });
+
+            async function loadDashboard() {
+                try {
+                    const s = App.getSettings();
+                    document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
+
+                    document.getElementById("set-name").value = s.restaurant_name;
+                    document.getElementById("set-t-bronze").value = s.bronze_threshold;
+                    document.getElementById("set-t-silver").value = s.silver_threshold;
+                    document.getElementById("set-t-gold").value = s.gold_threshold;
+                    document.getElementById("set-t-vip").value = s.vip_threshold;
+                    document.getElementById("set-d-new").value = s.discount_new;
+                    document.getElementById("set-d-bronze").value = s.discount_bronze;
+                    document.getElementById("set-d-silver").value = s.discount_silver;
+                    document.getElementById("set-d-gold").value = s.discount_gold;
+                    document.getElementById("set-d-vip").value = s.discount_vip;
+
+                    const stats = await App.getAdminStats();
+                    document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
+                    document.getElementById("stat-today-cust").innerText = stats.visitedToday;
+                    document.getElementById("stat-active").innerText = stats.active90d;
+                    document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
+
+                    document.getElementById("count-vip").innerText = stats.tierCounts.vip;
+                    document.getElementById("count-gold").innerText = stats.tierCounts.gold;
+                    document.getElementById("count-silver").innerText = stats.tierCounts.silver;
+                    document.getElementById("count-bronze").innerText = stats.tierCounts.bronze;
+                    document.getElementById("count-none").innerText = stats.tierCounts.none;
+
+                    renderActivity(stats.recentVisits);
+                    await renderCustomers();
+                } catch (e) {
+                    console.error(e);
+                    App.setAlert("dashboard-alert", "Error loading data. Check connection.", "error");
+                }
+            }
+
+            async function renderCustomers() {
+                try {
+                    const query = document.getElementById("search-input").value;
+                    const customers = await App.getAllCustomers(query);
+                    const tbody = document.getElementById("customers-tbody");
+
+                    if (customers.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--muted);">No customers found</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = customers.map(c => {
+                        const d = new Date(c.created_at);
+                        
+                        let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
+                        if (c.marketing_consent) {
+                            const mDate = new Date(c.consent_date);
+                            marketingHtml = `
+                                <div style="color: #2E7D32; font-weight: 500; font-size: 13px;">✓ Opted in</div>
+                                <div style="font-size: 11px; color: var(--muted);">${new Intl.DateTimeFormat('en-GB').format(mDate)}</div>
+                            `;
+                        }
+
+                        return `
+                        <tr>
+                            <td>
+                                <div class="customer-name">${escapeHTML(c.name)}</div>
+                                <div class="customer-email">${escapeHTML(c.email)}</div>
+                            </td>
+                            <td><span class="badge badge-${c.current_tier}">${App.tierLabel(c.current_tier)}</span></td>
+                            <td>${c.visit_count}</td>
+                            <td>£${c.spend_90d.toFixed(2)}</td>
+                            <td>${marketingHtml}</td>
+                            <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
+                            <td>
+                                <button class="btn-delete" onclick="window.handleDeleteCustomer('${c.email}')" title="Delete Customer">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                </button>
+                            </td>
+                        </tr>`;
+                    }).join('');
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            function renderActivity(visits) {
+                const list = document.getElementById("activity-list");
+                if (visits.length === 0) {
+                    list.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--muted);">No recent activity</div>`;
+                    return;
+                }
+
+                list.innerHTML = visits.map(v => `
+                    <div class="list-row">
+                        <div class="list-left">
+                            <div class="name">${escapeHTML(v.customerName)}</div>
+                            <div class="date">${v.date}</div>
+                        </div>
+                        <div class="list-right">
+                            <div class="spend">£${parseFloat(v.spend).toFixed(2)}</div>
+                            <div class="badge badge-${v.tier}">${App.tierLabel(v.tier)}</div>
+                            <div class="actions" style="display: flex; gap: 8px; margin-left: 12px;">
+                                <button class="btn-icon" onclick="window.handleEditVisit(${v.id}, ${v.spend})" title="Edit Spend">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button class="btn-icon" style="color: #B3261E;" onclick="window.handleDeleteVisit(${v.id})" title="Delete Record">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            function escapeHTML(str) {
+                const e = document.createElement('div');
+                if (str) e.innerText = str;
+                return e.innerHTML;
+            }
+
+            // Global Handlers for Admin Actions
+            window.handleDeleteCustomer = async (email) => {
+                if (!confirm(`Delete all records for ${email}? This cannot be undone.`)) return;
+                try {
+                    await App.deleteCustomer(email);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+
+            window.handleDeleteVisit = async (id) => {
+                if (!confirm(`Delete this visit record?`)) return;
+                try {
+                    await App.deleteVisit(id);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+
+            window.handleEditVisit = async (id, currentSpend) => {
+                const val = prompt("Enter new spend amount (£):", currentSpend);
+                if (val === null || val === "") return;
+                const spend = parseFloat(val);
+                if (isNaN(spend) || spend < 0) return alert("Invalid amount");
+                try {
+                    await App.editVisitSpend(id, spend);
+                    await loadDashboard();
+                } catch (e) { alert(e.message); }
+            };
+        });
+    </script>
+</body>
+
+</html>

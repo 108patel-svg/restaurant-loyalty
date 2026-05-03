@@ -8,6 +8,12 @@ const sgMail = require('@sendgrid/mail');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const cron = require('node-cron');
+const twilio = require('twilio');
+
+// SMS CONFIG
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN 
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
 
 const app = express();
 
@@ -34,8 +40,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Serve static frontend
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Serve static frontends
+app.use('/tablet', express.static(path.join(__dirname, '../frontend-tablet')));
+app.use('/public', express.static(path.join(__dirname, '../frontend-public')));
+// Fallback for backward compatibility or default
+app.use(express.static(path.join(__dirname, '../frontend-tablet')));
 
 /* 
  * SECURITY NOTE: The DATABASE_URL must point to a private/internal database. 
@@ -48,6 +57,22 @@ const pool = new Pool({
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+// reCAPTCHA verification (Node 18+ has native fetch)
+async function verifyRecaptcha(token) {
+  if (!token) return false;
+  try {
+    const response = await fetch(
+      `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${token}`,
+      { method: 'POST' }
+    );
+    const data = await response.json();
+    return data.success && data.score >= 0.5;
+  } catch (err) {
+    console.error('reCAPTCHA error:', err);
+    return false;
+  }
 }
 
 // Helpers
@@ -334,6 +359,229 @@ app.post('/api/visit', visitLimiter, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ====== SMS Verification ======
+const verificationCodes = new Map(); // In production, use Redis
+
+app.post('/api/send-code', visitLimiter, async (req, res) => {
+  const { phone, recaptcha_token } = req.body;
+  
+  if (!await verifyRecaptcha(recaptcha_token)) {
+    return res.status(403).json({ error: "Bot verification failed." });
+  }
+
+  if (!phone || !phone.match(/^\+?[1-9]\d{1,14}$/)) {
+    return res.status(400).json({ error: "Invalid phone number format." });
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  verificationCodes.set(phone, { code, expires: Date.now() + 10 * 60 * 1000 });
+
+  if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
+    try {
+      await twilioClient.messages.create({
+        body: `Your loyalty verification code is: ${code}`,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+      res.json({ success: true, message: "Code sent." });
+    } catch (err) {
+      console.error('Twilio error:', err);
+      res.status(500).json({ error: "Failed to send SMS." });
+    }
+  } else {
+    console.log(`[SMS STUB] Code for ${phone}: ${code}`);
+    res.json({ success: true, message: "Code sent (stub)." });
+  }
+});
+
+app.post('/api/checkin', visitLimiter, async (req, res) => {
+  let { name, phone, email, marketing_consent, code, recaptcha_token } = req.body;
+
+  if (!await verifyRecaptcha(recaptcha_token)) {
+    return res.status(403).json({ error: "Bot verification failed." });
+  }
+
+  // Verify code
+  const entry = verificationCodes.get(phone);
+  if (!entry || entry.code !== code || entry.expires < Date.now()) {
+    return res.status(400).json({ error: "Invalid or expired verification code." });
+  }
+  verificationCodes.delete(phone);
+
+  try {
+    const s = await getSettings();
+    phone = phone.trim();
+    name = name.trim();
+    email = email ? email.trim().toLowerCase() : null;
+
+    // Upsert customer by phone
+    const custRes = await pool.query(
+      `INSERT INTO customers (name, phone, email, marketing_consent, consent_date, consent_ip) 
+       VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN NOW() ELSE NULL END, CASE WHEN $4 THEN $5 ELSE NULL END)
+       ON CONFLICT (phone) DO UPDATE SET 
+         name = EXCLUDED.name,
+         email = COALESCE(EXCLUDED.email, customers.email),
+         marketing_consent = CASE WHEN EXCLUDED.marketing_consent THEN TRUE ELSE customers.marketing_consent END,
+         consent_date = CASE WHEN EXCLUDED.marketing_consent AND NOT customers.marketing_consent THEN NOW() ELSE customers.consent_date END,
+         consent_ip = CASE WHEN EXCLUDED.marketing_consent AND NOT customers.marketing_consent THEN $5 ELSE customers.consent_ip END
+       RETURNING id, name, current_tier, created_at`,
+      [name, phone, email, !!marketing_consent, req.ip]
+    );
+    const customer = custRes.rows[0];
+
+    // Mark as pending
+    await pool.query(
+      'INSERT INTO pending_checkins (customer_id) VALUES ($1)',
+      [customer.id]
+    );
+
+    // Calculate status for confirmation screen
+    const sRes = await pool.query(
+      `SELECT SUM(spend) as total FROM visits
+       WHERE customer_id = $1 AND visited_at >= NOW() - INTERVAL '90 days'`,
+      [customer.id]
+    );
+    const spend90d = parseFloat(sRes.rows[0].total) || 0;
+    const tier = customer.current_tier;
+    const discount = tierDiscount(tier, s, false);
+
+    res.json({
+      success: true,
+      name: customer.name,
+      tier: tier,
+      discount: discount,
+      spend90d: spend90d
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Check-in failed." });
+  }
+});
+
+app.get('/api/status', async (req, res) => {
+  const { phone, recaptcha_token } = req.query;
+
+  if (!await verifyRecaptcha(recaptcha_token)) {
+    return res.status(403).json({ error: "Bot verification failed." });
+  }
+
+  try {
+    const s = await getSettings();
+    const cRes = await pool.query('SELECT * FROM customers WHERE phone = $1', [phone]);
+    if (cRes.rowCount === 0) {
+      return res.json({ found: false });
+    }
+    const c = cRes.rows[0];
+
+    const sRes = await pool.query(
+      `SELECT SUM(spend) as total, COUNT(*) as count, MAX(visited_at) as last
+       FROM visits WHERE customer_id = $1 AND visited_at >= NOW() - INTERVAL '90 days'`,
+      [c.id]
+    );
+    const spend90d = parseFloat(sRes.rows[0].total) || 0;
+    const totalVisits = parseInt(sRes.rows[0].count);
+    const lastVisit = sRes.rows[0].last;
+
+    const tier = c.current_tier;
+    const discount = tierDiscount(tier, s, false);
+
+    let nextTier = 'none';
+    let nextThreshold = 0;
+    if (tier === 'none') { nextTier = 'bronze'; nextThreshold = Number(s.bronze_threshold); }
+    else if (tier === 'bronze') { nextTier = 'silver'; nextThreshold = Number(s.silver_threshold); }
+    else if (tier === 'silver') { nextTier = 'gold'; nextThreshold = Number(s.gold_threshold); }
+    else if (tier === 'gold') { nextTier = 'vip'; nextThreshold = Number(s.vip_threshold); }
+
+    let progressPercent = 0;
+    if (nextThreshold > 0) {
+      let prevThresh = 0;
+      if (tier === 'bronze') prevThresh = s.bronze_threshold;
+      else if (tier === 'silver') prevThresh = s.silver_threshold;
+      else if (tier === 'gold') prevThresh = s.gold_threshold;
+      progressPercent = Math.min(100, Math.max(0, ((spend90d - prevThresh) / (nextThreshold - prevThresh)) * 100));
+    }
+
+    res.json({
+      found: true,
+      name: c.name,
+      tier: tier,
+      spend90d: spend90d,
+      discount: discount,
+      totalVisits: totalVisits,
+      consentDate: c.consent_date ? new Intl.DateTimeFormat('en-GB').format(c.consent_date) : 'N/A',
+      lastVisit: lastVisit ? new Intl.DateTimeFormat('en-GB').format(lastVisit) : 'Never',
+      nextTier: nextTier,
+      nextThreshold: nextThreshold,
+      progressPercent: progressPercent
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Status check failed." });
+  }
+});
+
+app.get('/api/admin/pending-checkins', adminLimiter, checkAdmin, async (req, res) => {
+  try {
+    const q = `
+      SELECT c.name, c.phone, c.current_tier as tier, p.checked_in_at, c.id as customer_id
+      FROM pending_checkins p
+      JOIN customers c ON p.customer_id = c.id
+      WHERE p.spend_recorded = FALSE AND p.checked_in_at >= CURRENT_DATE
+      ORDER BY p.checked_in_at DESC
+    `;
+    const rs = await pool.query(q);
+    res.json(rs.rows.map(r => ({
+      ...r,
+      timeAgo: Math.floor((Date.now() - new Date(r.checked_in_at)) / 60000)
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch pending check-ins." });
+  }
+});
+
+app.post('/api/admin/record-spend', adminLimiter, checkAdmin, async (req, res) => {
+  let { phone, spend } = req.body;
+  spend = parseFloat(spend);
+  if (isNaN(spend) || spend <= 0 || spend > 500) {
+    return res.status(400).json({ error: "Invalid spend amount (max £500)." });
+  }
+
+  try {
+    const cRes = await pool.query('SELECT id, name, current_tier, email FROM customers WHERE phone = $1', [phone]);
+    if (cRes.rowCount === 0) return res.status(404).json({ error: "Customer not found." });
+    const customer = cRes.rows[0];
+
+    // Insert visit
+    await pool.query('INSERT INTO visits (customer_id, spend) VALUES ($1, $2)', [customer.id, spend]);
+
+    // Mark pending as recorded
+    await pool.query(`
+      UPDATE pending_checkins 
+      SET spend_recorded = TRUE, spend_recorded_at = NOW()
+      WHERE id = (
+        SELECT id FROM pending_checkins 
+        WHERE customer_id = $1 AND spend_recorded = FALSE
+        ORDER BY checked_in_at DESC
+        LIMIT 1
+      )
+    `, [customer.id]);
+
+    const s = await getSettings();
+    const { spend90d, newTier } = await recalculateTier(customer.id, s);
+    const tierUp = tierOrder(newTier) > tierOrder(customer.current_tier);
+
+    res.json({
+      success: true,
+      name: customer.name,
+      tier: newTier,
+      tierUp: tierUp
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to record spend." });
   }
 });
 
