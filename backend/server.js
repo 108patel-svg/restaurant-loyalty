@@ -10,6 +10,9 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Render Proxy Trust (Fixes rate-limit warning)
+app.set('trust proxy', 1);
+
 // DB Setup
 const dbPath = path.join(__dirname, 'loyalty.db');
 const db = new sqlite3.Database(dbPath);
@@ -63,7 +66,7 @@ const statusLimiter = rateLimit({
 // Emails
 async function sendEmail(to, subject, text, html) {
   const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.RESTAURANT_EMAIL;
+  const fromEmail = process.env.FROM_EMAIL || process.env.RESTAURANT_EMAIL;
   
   console.log(`[EMAIL] Attempting to send to ${to}. (Using Sender: ${fromEmail || 'MISSING'})`);
 
@@ -115,7 +118,7 @@ async function getSettings() {
   }
   return {
     restaurant_name: 'The Restaurant',
-    admin_pin: '1234',
+    admin_pin: process.env.ADMIN_PIN || '1234',
     discount_new: 10,
     discount_bronze: 10,
     discount_silver: 15,
@@ -293,8 +296,8 @@ const adminAuth = async (req, res, next) => {
   const pin = req.headers['x-admin-pin'];
   const s = await getSettings();
   
-  // Emergency override for PIN 1234
-  if (pin === '1234' || pin === s.admin_pin) {
+  // Emergency override for PIN from Env or DB
+  if (pin === (process.env.ADMIN_PIN || '1234') || pin === s.admin_pin) {
     return next();
   }
   
