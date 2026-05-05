@@ -86,7 +86,6 @@
         .tier-bronze { background: #FAF0E8; color: #A0673A; }
         .tier-silver { background: #EEF1F4; color: #3A4F5E; }
         .tier-gold { background: #FDF6E3; color: #C8A84B; }
-        .tier-vip { background: var(--brand-dark); color: #C8A84B; }
 
         .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
         .stat-box { background: #F9F7F5; padding: 20px; border-radius: 16px; border: 1px solid var(--border); }
@@ -222,7 +221,7 @@
                             document.getElementById('disp-since').innerText = data.consentDate;
                             document.getElementById('disp-last').innerText = data.lastVisit;
 
-                            if (data.tier === 'vip') {
+                            if (data.tier === 'gold') {
                                 document.getElementById('progress-area').style.display = 'none';
                             } else {
                                 document.getElementById('progress-area').style.display = 'block';

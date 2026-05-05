@@ -16,13 +16,18 @@ const isProd = !!process.env.DATABASE_URL;
 let db;
 
 if (isProd) {
+  console.log('[DB] Initializing PostgreSQL Pool...');
   db = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.DATABASE_URL.trim(),
     ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 5000, // 5 seconds
+    connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000
   });
+  db.on('error', (err) => {
+    console.error('[DB] Unexpected error on idle client:', err.message);
+  });
 } else {
+  console.log('[DB] Initializing SQLite...');
   const dbPath = path.join(__dirname, 'loyalty.db');
   db = new sqlite3.Database(dbPath);
 }
