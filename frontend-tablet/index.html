@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <script src="https://www.google.com/recaptcha/api.js?render=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></script>
     <style>
         :root {
             --brand: #C4531A;
@@ -137,7 +136,7 @@
                 <button type="button" class="btn-primary" onclick="resetForm()" style="background: #EEE; color: #666; margin-top: 12px; height: 48px; font-size: 14px;">Cancel</button>
             </form>
             <div class="footer-links">
-                By continuing, you agree to our <a href="terms.html" target="_blank">Terms & Privacy Policy</a>.
+                By continuing, you agree to our <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.
             </div>
         </div>
 
@@ -156,7 +155,25 @@
     </div>
 
     <script>
-        const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+        let RECAPTCHA_SITE_KEY = '';
+
+        async function initApp() {
+            try {
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                RECAPTCHA_SITE_KEY = config.recaptchaSiteKey;
+
+                if (RECAPTCHA_SITE_KEY) {
+                    const script = document.createElement('script');
+                    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
+                    document.head.appendChild(script);
+                }
+            } catch (err) {
+                console.error("Failed to load config:", err);
+            }
+        }
+        initApp();
+
         let currentSpend = 0;
         let resetTimer;
 

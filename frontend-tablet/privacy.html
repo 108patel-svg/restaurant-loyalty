@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Loyalty Programme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
+            --muted: #6B6259;
+            --border: rgba(26, 20, 16, 0.12);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--dark);
+            line-height: 1.7;
+            font-size: 15px;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 500;
+            color: var(--dark);
+            margin-bottom: 24px;
+        }
+        h1 { font-size: 2.5rem; text-align: center; }
+        h2 { font-size: 1.8rem; margin-top: 40px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        p { margin-bottom: 16px; color: var(--dark); }
+        ul { margin-bottom: 24px; padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        .back-link {
+            display: inline-block;
+            color: var(--ember);
+            text-decoration: none;
+            font-weight: 500;
+            margin-bottom: 40px;
+        }
+        .back-link:hover { text-decoration: underline; }
+        strong { font-weight: 600; }
+        
+        .subprocessor-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px; }
+        .subprocessor-table th, .subprocessor-table td { text-align: left; padding: 12px; border: 1px solid var(--border); }
+        .subprocessor-table th { background: rgba(26, 20, 16, 0.04); font-weight: 600; }
+        
+        @media (max-width: 600px) {
+            .subprocessor-table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to loyalty form</a>
+
+        <h1 class="restaurant-name-disp">Privacy Policy</h1>
+        <p style="text-align: center; color: var(--muted); margin-top: -20px;">Protecting your data and privacy</p>
+
+        <h2>1. What data we collect</h2>
+        <p>We collect and process the following information to manage your loyalty account:</p>
+        <ul>
+            <li><strong>Full Name:</strong> To identify you in our system and personalise your rewards.</li>
+            <li><strong>Email Address:</strong> To track your rewards and send you account updates or marketing (if opted in).</li>
+            <li><strong>Visit History:</strong> The date, time, and spend amount of each visit.</li>
+            <li><strong>Loyalty Tier:</strong> Your current status (Bronze, Silver, Gold).</li>
+            <li><strong>Marketing Consent:</strong> Whether you have opted in to receive updates, including a secure timestamp.</li>
+        </ul>
+
+        <h2>2. Why we collect it (Legal Basis)</h2>
+        <p>We process your data under the UK GDPR (General Data Protection Regulation):</p>
+        <ul>
+            <li><strong>Legitimate Interests:</strong> To operate the loyalty programme, calculate your rewards, and prevent fraud.</li>
+            <li><strong>Consent:</strong> For sending marketing communications. You can withdraw your consent at any time via the "unsubscribe" link in any email.</li>
+        </ul>
+
+        <h2>3. Our Subprocessors</h2>
+        <p>We use trusted third-party services to run this loyalty programme. Your data is handled securely in accordance with law.</p>
+        
+        <table class="subprocessor-table">
+            <thead>
+                <tr>
+                    <th>Subprocessor</th>
+                    <th>Purpose</th>
+                    <th>Data Shared</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>SendGrid (Twilio)</td>
+                    <td>Email delivery for rewards.</td>
+                    <td>Name, Email</td>
+                    <td>USA (SCCs)</td>
+                </tr>
+                <tr>
+                    <td>Render.com</td>
+                    <td>Cloud hosting and database.</td>
+                    <td>Database Records</td>
+                    <td>EU/USA (SCCs)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. Data Retention</h2>
+        <p>We keep your data for as long as you are an active member. <strong>Automatic Deletion:</strong> If you do not visit for 12 months, your account and all associated data are permanently deleted from our primary database.</p>
+
+        <h2>5. Your Rights</h2>
+        <p>You have the right to access, correct, or delete your data at any time. You can also request a copy of your visit history or ask us to restrict the processing of your information.</p>
+
+        <h2>6. Contact Us</h2>
+        <p>If you have any questions about your privacy, please contact our Data Controller at:</p>
+        <p>
+            <strong>Restaurant:</strong> <span class="restaurant-name-disp">[Restaurant Name]</span><br>
+            <strong>Email:</strong> <span id="contact-email">[INSERT RESTAURANT EMAIL]</span><br>
+            <strong>Address:</strong> <span id="contact-address">[INSERT RESTAURANT ADDRESS]</span>
+        </p>
+
+        <p style="margin-top: 40px; font-size: 14px; color: var(--muted); text-align: center;">
+            Last updated: May 2024
+        </p>
+
+        <div style="text-align: center; margin-top: 40px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <a href="terms.html" style="color: var(--muted); text-decoration: none; font-size: 14px; margin: 0 10px;">Terms of Service</a>
+            <a href="index.html" style="color: var(--ember); text-decoration: none; font-size: 14px; margin: 0 10px; font-weight: 600;">Back to Check-in</a>
+        </div>
+    </div>
+
+    <script>
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/admin/settings', { headers: { 'x-admin-pin': '7788' } });
+                const data = await res.json();
+                if (data.restaurant_name) {
+                    document.querySelectorAll('.restaurant-name-disp').forEach(el => el.innerText = data.restaurant_name);
+                }
+                if (data.restaurant_email) {
+                    document.getElementById('contact-email').innerText = data.restaurant_email;
+                }
+                if (data.restaurant_address) {
+                    document.getElementById('contact-address').innerText = data.restaurant_address;
+                }
+            } catch (e) {
+                console.error("Failed to load restaurant details", e);
+            }
+        }
+        loadSettings();
+    </script>
+</body>
+</html>

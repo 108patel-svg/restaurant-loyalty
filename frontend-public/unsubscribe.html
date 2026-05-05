@@ -3,102 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscribe - Loyalty Rewards</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <title>Unsubscribe - Loyalty Programme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --brand: #C4531A;
+            --brand-dark: #1A1410;
+            --bg: #F7F3EE;
+            --text: #1A1410;
+            --muted: #6B6259;
+            --white: #FFFFFF;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        :root { --cream: #F7F3EE; --dark: #1A1410; --ember: #C4531A; --border: rgba(26,20,16,0.12); }
-        body { font-family: 'DM Sans', sans-serif; background-color: var(--cream); color: var(--dark); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-image: url('background.jpg'); background-size: cover; background-position: center; }
-        .card { background-color: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 24px rgba(0,0,0,0.08); width: 100%; max-width: 400px; padding: 32px 24px; text-align: center; }
-        h1 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; margin-bottom: 12px; }
-        p { font-size: 14px; line-height: 1.6; margin-bottom: 16px; color: #6B6259; }
-        button { width: 100%; height: 48px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; transition: 0.2s; border: none; margin-bottom: 12px; }
-        .btn-unsub { background-color: #B3261E; color: white; }
-        .btn-unsub:hover { background-color: #8C1D18; }
-        .btn-resub { background-color: var(--ember); color: white; display: none; }
-        .btn-resub:hover { opacity: 0.9; }
-        .success { color: #2E7D32; font-weight: 500; display: none; }
-        .error { color: #B3261E; font-weight: 500; display: none; }
-        a { font-size: 12px; color: #6B6259; text-decoration: none; display: block; margin-top: 16px; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: var(--white);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        h1 { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 12px; }
+        p { color: var(--muted); line-height: 1.5; margin-bottom: 30px; }
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #EEE;
+            border-top: 3px solid var(--brand);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .success-icon { color: #2E7D32; font-size: 48px; margin-bottom: 20px; }
+        .error-icon { color: #B3261E; font-size: 48px; margin-bottom: 20px; }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: var(--brand-dark);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1 id="title">Unsubscribe</h1>
-        <p id="description">Are you sure you'd like to stop receiving loyalty reward emails? You'll still keep your tier and discounts — you just won't hear from us by email.</p>
-        <button class="btn-unsub" id="unsub-btn" onclick="handleUnsub()">Yes, unsubscribe me</button>
-        <button class="btn-resub" id="resub-btn" onclick="handleResub()">Re-subscribe</button>
-        <p class="success" id="success-msg"></p>
-        <p class="error" id="error-msg"></p>
-        <a href="index.html">&larr; Back to check-in</a>
+    <div class="card" id="main-card">
+        <div id="loading">
+            <div class="loading-spinner"></div>
+            <h1>Processing...</h1>
+            <p>Please wait while we update your preferences.</p>
+        </div>
+
+        <div id="success" style="display: none;">
+            <div class="success-icon">✓</div>
+            <h1>Unsubscribed</h1>
+            <p>Your email preferences have been updated. You will no longer receive marketing emails from us.</p>
+            <a href="index.html" class="btn">Back to Home</a>
+        </div>
+
+        <div id="error" style="display: none;">
+            <div class="error-icon">!</div>
+            <h1>Request Failed</h1>
+            <p id="error-msg">This unsubscribe link is invalid or has expired.</p>
+            <a href="index.html" class="btn">Back to Home</a>
+        </div>
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
+        async function handleUnsubscribe() {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
 
-        if (!token) {
-            document.getElementById('title').innerText = 'Invalid Link';
-            document.getElementById('description').innerText = 'This unsubscribe link is invalid or has expired.';
-            document.getElementById('unsub-btn').style.display = 'none';
-        }
+            if (!token) {
+                showState('error', 'No secure token provided in the link.');
+                return;
+            }
 
-        async function handleUnsub() {
-            const btn = document.getElementById('unsub-btn');
-            btn.disabled = true;
-            btn.innerText = 'Processing...';
             try {
-                const res = await fetch('/api/unsubscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    document.getElementById('success-msg').innerText = `Done! ${data.email} has been unsubscribed. We're sorry to see you go.`;
-                    document.getElementById('success-msg').style.display = 'block';
-                    btn.style.display = 'none';
-                    document.getElementById('description').style.display = 'none';
-                    document.getElementById('resub-btn').style.display = 'block';
-                    document.getElementById('title').innerText = 'Unsubscribed';
+                const res = await fetch(`/api/unsubscribe/${token}`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.success) {
+                    showState('success');
                 } else {
-                    const err = await res.json();
-                    document.getElementById('error-msg').innerText = err.error || 'Something went wrong.';
-                    document.getElementById('error-msg').style.display = 'block';
-                    btn.disabled = false;
-                    btn.innerText = 'Yes, unsubscribe me';
+                    showState('error', data.error);
                 }
-            } catch (e) {
-                document.getElementById('error-msg').innerText = 'Network error. Please try again.';
-                document.getElementById('error-msg').style.display = 'block';
-                btn.disabled = false;
-                btn.innerText = 'Yes, unsubscribe me';
+            } catch (err) {
+                showState('error', 'Unable to connect to the server. Please try again later.');
             }
         }
 
-        async function handleResub() {
-            const btn = document.getElementById('resub-btn');
-            btn.disabled = true;
-            btn.innerText = 'Processing...';
-            try {
-                const res = await fetch('/api/resubscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token })
-                });
-                if (res.ok) {
-                    document.getElementById('success-msg').innerText = 'Welcome back! You have been re-subscribed to loyalty emails.';
-                    document.getElementById('title').innerText = 'Re-subscribed!';
-                    btn.style.display = 'none';
-                } else {
-                    btn.disabled = false;
-                    btn.innerText = 'Re-subscribe';
-                }
-            } catch (e) {
-                btn.disabled = false;
-                btn.innerText = 'Re-subscribe';
-            }
+        function showState(state, msg) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById(state).style.display = 'block';
+            if (msg) document.getElementById('error-msg').innerText = msg;
         }
+
+        handleUnsubscribe();
     </script>
 </body>
 </html>

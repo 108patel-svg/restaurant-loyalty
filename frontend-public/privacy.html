@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Loyalty Programme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #C4531A;
+            --brand-dark: #1A1410;
+            --bg: #F7F3EE;
+            --text: #1A1410;
+            --muted: #6B6259;
+            --white: #FFFFFF;
+            --border: rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: var(--white);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        h1, h2 {
+            font-family: 'Playfair Display', serif;
+            color: var(--brand-dark);
+            margin-bottom: 24px;
+        }
+        h1 { font-size: 2.5rem; text-align: center; }
+        h2 { font-size: 1.6rem; margin-top: 32px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        p { margin-bottom: 16px; }
+        ul { margin-bottom: 24px; padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        .back-link {
+            display: inline-block;
+            color: var(--brand);
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 32px;
+        }
+        strong { font-weight: 600; }
+        
+        .subprocessor-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px; }
+        .subprocessor-table th, .subprocessor-table td { text-align: left; padding: 12px; border: 1px solid var(--border); }
+        .subprocessor-table th { background: rgba(0,0,0,0.02); font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Rewards</a>
+
+        <h1 class="restaurant-name-disp">Privacy Policy</h1>
+        <p style="text-align: center; color: var(--muted); margin-top: -15px;">Your data is safe with us.</p>
+
+        <h2>1. What data we collect</h2>
+        <p>To operate our loyalty programme, we collect:</p>
+        <ul>
+            <li><strong>Name:</strong> For your loyalty account profile.</li>
+            <li><strong>Email:</strong> To track rewards and send notifications.</li>
+            <li><strong>Visits:</strong> Date, time, and spend of your restaurant visits.</li>
+            <li><strong>Marketing Status:</strong> Whether you've opted into updates.</li>
+        </ul>
+
+        <h2>2. UK GDPR Compliance</h2>
+        <p>We process your data under the legal basis of <strong>Legitimate Interests</strong> (operating the loyalty scheme) and <strong>Consent</strong> (for marketing emails). You can opt-out of marketing at any time.</p>
+
+        <h2>3. Third-Parties</h2>
+        <table class="subprocessor-table">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Purpose</th>
+                    <th>Shared Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>SendGrid</td>
+                    <td>Reward Emails</td>
+                    <td>Name, Email</td>
+                </tr>
+                <tr>
+                    <td>Render</td>
+                    <td>Hosting</td>
+                    <td>Account Records</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. Data Retention</h2>
+        <p>If your account shows no activity for <strong>12 consecutive months</strong>, we will automatically delete your personal data to ensure your privacy.</p>
+
+        <h2>5. Your Rights</h2>
+        <p>You have the right to request a copy of your data, correct any errors, or request total deletion by contacting us below.</p>
+
+        <h2>6. Contact</h2>
+        <p>
+            <strong>Restaurant:</strong> <span class="restaurant-name-disp">[Restaurant Name]</span><br>
+            <strong>Email:</strong> <span id="contact-email">[Email]</span>
+        </p>
+
+        <div style="text-align: center; margin-top: 40px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <a href="terms.html" style="color: var(--muted); text-decoration: none; font-size: 14px; margin: 0 10px;">Terms</a>
+            <a href="index.html" style="color: var(--brand); text-decoration: none; font-size: 14px; margin: 0 10px; font-weight: 600;">Home</a>
+        </div>
+    </div>
+
+    <script>
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/admin/settings', { headers: { 'x-admin-pin': '7788' } });
+                const data = await res.json();
+                if (data.restaurant_name) {
+                    document.querySelectorAll('.restaurant-name-disp').forEach(el => el.innerText = data.restaurant_name);
+                }
+                if (data.restaurant_email) {
+                    document.getElementById('contact-email').innerText = data.restaurant_email;
+                }
+            } catch (e) {}
+        }
+        loadSettings();
+    </script>
+</body>
+</html>

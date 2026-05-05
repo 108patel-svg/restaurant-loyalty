@@ -30,6 +30,7 @@ if (isProd) {
   console.log('[DB] Initializing SQLite...');
   const dbPath = path.join(__dirname, 'loyalty.db');
   db = new sqlite3.Database(dbPath);
+  db.run('PRAGMA foreign_keys = ON');
 }
 
 const run = (sql, params = []) => {
@@ -232,7 +233,7 @@ app.get('/api/debug', async (req, res) => {
 
 // ENDPOINTS
 app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
-  let { name, email, phone, spend, marketing_consent, recaptcha_token } = req.body;
+  let { name, email, spend, marketing_consent, recaptcha_token } = req.body;
   spend = parseFloat(spend) || 0;
 
   if (!await verifyRecaptcha(recaptcha_token)) return res.status(403).json({ error: "Bot verification failed." });
@@ -244,14 +245,14 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
     name = name.trim();
 
     await run(
-      `INSERT INTO customers (name, email, phone, marketing_consent, consent_date, consent_ip) 
-       VALUES (?, ?, ?, ?, CASE WHEN ? THEN ${getNow()} ELSE NULL END, CASE WHEN ? THEN ? ELSE NULL END)
+      `INSERT INTO customers (name, email, marketing_consent, consent_date, consent_ip) 
+       VALUES (?, ?, ?, CASE WHEN ? THEN ${getNow()} ELSE NULL END, CASE WHEN ? THEN ? ELSE NULL END)
        ON CONFLICT (email) DO UPDATE SET 
          name = EXCLUDED.name,
          marketing_consent = EXCLUDED.marketing_consent,
          consent_date = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_date, ${getNow()}) ELSE NULL END,
          consent_ip = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_ip, ?) ELSE NULL END`,
-      [name, email, phone, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, req.ip, req.ip]
+      [name, email, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, req.ip, req.ip]
     );
 
     auditLog('customer_checkin', `${name} (${email})`);
@@ -374,7 +375,7 @@ app.get('/api/admin/customers', adminAuth, async (req, res) => {
   const s = await getSettings();
   const { search } = req.query;
   let sql = `
-    SELECT c.*, 
+    SELECT id, name, email, current_tier, marketing_consent, created_at, 
     COALESCE(SUM(CASE WHEN v.visited_at > ${getWindowAgo(s.tier_window_days)} THEN v.spend ELSE 0 END), 0) as spend_90d,
     COUNT(v.id) as visit_count
     FROM customers c
@@ -483,7 +484,7 @@ app.get('/api/admin/audit-log', adminAuth, async (req, res) => {
 
 app.get('/api/admin/export', adminAuth, async (req, res) => {
   const customers = await query(`
-    SELECT name, email, phone, current_tier, 
+    SELECT name, email, current_tier, 
     (SELECT COUNT(*) FROM visits WHERE customer_id = c.id) as visits,
     (SELECT SUM(spend) FROM visits WHERE customer_id = c.id) as total_spend,
     marketing_consent, created_at
@@ -491,9 +492,9 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
   `);
   
   const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
-  let csv = 'Name,Email,Phone,Tier,Visits,Total Spend,Marketing,Joined\n';
+  let csv = 'Name,Email,Tier,Visits,Total Spend,Marketing,Joined\n';
   customers.forEach(c => {
-    csv += `${esc(c.name)},${esc(c.email)},${esc(c.phone)},${esc(c.current_tier)},${c.visits},${c.total_spend || 0},${c.marketing_consent ? 'YES' : 'NO'},${esc(c.created_at)}\n`;
+    csv += `${esc(c.name)},${esc(c.email)},${esc(c.current_tier)},${c.visits},${c.total_spend || 0},${c.marketing_consent ? 'YES' : 'NO'},${esc(c.created_at)}\n`;
   });
   
   auditLog('export_csv', 'Full customer list');
@@ -502,16 +503,56 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
   res.send(csv);
 });
 
-// CRON: Nightly cleanup at 02:00
+// Public Config for reCAPTCHA
+app.get('/api/config', (req, res) => {
+  res.json({ recaptchaSiteKey: process.env.RECAPTCHA_SITE_KEY });
+});
+
+// Unsubscribe Endpoint
+app.post('/api/unsubscribe/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const customer = await query('SELECT email, name FROM customers WHERE unsubscribe_token = ?', [token]);
+    if (customer.length === 0) return res.status(404).json({ error: "Invalid or expired link." });
+    
+    await run('UPDATE customers SET marketing_consent = 0 WHERE unsubscribe_token = ?', [token]);
+    auditLog('unsubscribe_gdpr', `${customer[0].name} (${customer[0].email})`);
+    res.json({ success: true, message: "You have been successfully unsubscribed." });
+  } catch (err) {
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+});
+
+// CRON: 12-month data retention purge
 cron.schedule('0 2 * * *', async () => {
-  console.log('[CRON] Starting data retention cleanup...');
-  const cutoff = isProd ? "NOW() - INTERVAL '365 days'" : "DATETIME('now', '-365 days')";
-  await run(`
-    DELETE FROM customers WHERE id NOT IN (
-      SELECT DISTINCT customer_id FROM visits WHERE visited_at > ${cutoff}
-    ) AND created_at < ${cutoff}
-  `);
-  console.log('[CRON] Cleanup complete.');
+  try {
+    await run(`
+      DELETE FROM customers WHERE id NOT IN (
+        SELECT DISTINCT customer_id FROM visits
+        WHERE visited_at > ${isProd ? "CURRENT_TIMESTAMP - INTERVAL '365 days'" : "DATETIME('now', '-365 days')"}
+      ) AND (
+        created_at < ${isProd ? "CURRENT_TIMESTAMP - INTERVAL '365 days'" : "DATETIME('now', '-365 days')"}
+        OR id NOT IN (SELECT DISTINCT customer_id FROM visits)
+      )
+    `);
+    console.log('[CRON] 12-month data retention purge completed.');
+  } catch (err) {
+    console.error('[CRON] Purge failed:', err.message);
+  }
+});
+
+// CRON: Pending check-ins cleanup
+cron.schedule('0 2 * * *', async () => {
+  try {
+    await run(`
+      DELETE FROM pending_checkins
+      WHERE spend_recorded = 0
+      AND checked_in_at < ${isProd ? "CURRENT_TIMESTAMP - INTERVAL '1 day'" : "DATETIME('now', '-1 day')"}
+    `);
+    console.log('[CRON] Pending check-ins cleanup completed.');
+  } catch (err) {
+    console.error('[CRON] Pending cleanup failed:', err.message);
+  }
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
