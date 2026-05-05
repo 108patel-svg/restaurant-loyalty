@@ -483,6 +483,7 @@
             <button class="tab" data-tab="tab-activity">Recent activity</button>
             <button class="tab" data-tab="tab-audit">Audit log</button>
             <button class="tab" data-tab="tab-settings">Settings</button>
+            <button class="tab" data-tab="tab-emails">Email Designer</button>
             <button class="tab" data-tab="tab-guide">Program Guide</button>
         </div>
 
@@ -635,6 +636,51 @@
 
                         <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
                     </div>
+            </div>
+
+            <!-- TAB: EMAIL DESIGNER -->
+            <div id="tab-emails" class="tab-pane">
+                <div class="card">
+                    <h2 style="margin-bottom: 24px; font-family: 'Playfair Display', serif;">Email Designer</h2>
+                    <p style="color: var(--muted); margin-bottom: 30px;">Type your messages below. Use {name}, {reward}, or {tier} to insert customer data.</p>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                        <!-- Editor -->
+                        <div style="display: flex; flex-direction: column; gap: 30px;">
+                            <div class="email-section">
+                                <label style="display:block; margin-bottom:8px; font-weight:600;">Template Type</label>
+                                <select id="email-selector" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+                                    <option value="welcome">Welcome Email</option>
+                                    <option value="milestone">Milestone Reward</option>
+                                    <option value="tier">Level Up (Tier)</option>
+                                </select>
+
+                                <div class="form-group">
+                                    <label>Subject Line</label>
+                                    <input type="text" id="email-subject" style="width:100%;" placeholder="Subject">
+                                </div>
+                                <div class="form-group" style="margin-top:15px;">
+                                    <label>Message Body</label>
+                                    <textarea id="email-body" style="width:100%; height:200px; padding:15px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px;"></textarea>
+                                </div>
+                                <button class="primary" id="btn-save-emails" style="width:100%; margin-top:10px;">Save This Template</button>
+                            </div>
+                        </div>
+
+                        <!-- Mobile Preview -->
+                        <div style="background: #F4F1EE; padding: 30px; border-radius: 24px; border: 1px solid var(--border); display: flex; justify-content: center;">
+                            <div style="width: 280px; height: 500px; background: white; border: 12px solid #1A1410; border-radius: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); position: relative; overflow: hidden; padding: 20px;">
+                                <div style="width: 60px; height: 4px; background: #333; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); border-radius: 2px;"></div>
+                                <div style="margin-top: 30px; border-bottom: 1px solid #EEE; padding-bottom: 15px; margin-bottom: 15px;">
+                                    <div id="prev-subject" style="font-weight: 700; font-size: 14px; color: #1A1410;">Subject Preview</div>
+                                </div>
+                                <div id="prev-body" style="font-size: 13px; line-height: 1.6; color: #444; white-space: pre-wrap;">Message body will appear here...</div>
+                                <div style="position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; font-size: 10px; color: #AAA; padding: 0 20px;">
+                                    You received this because you joined the loyalty club. <a href="#" style="color: var(--brand); text-decoration: none;">Unsubscribe</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -756,6 +802,55 @@
                 await renderCustomers();
             });
 
+            // --- EMAIL DESIGNER LOGIC ---
+            function updateEmailEditor() {
+                const type = document.getElementById('email-selector').value;
+                const template = window.emailTemplates[type];
+                document.getElementById('email-subject').value = template.subject || '';
+                document.getElementById('email-body').value = template.body || '';
+                syncPreview();
+            }
+
+            function syncPreview() {
+                const subject = document.getElementById('email-subject').value;
+                let body = document.getElementById('email-body').value;
+                
+                // Demo placeholders
+                body = body.replace(/{name}/g, '<strong>John Doe</strong>')
+                           .replace(/{reward}/g, '<strong>Free Dessert</strong>')
+                           .replace(/{tier}/g, '<strong>Gold</strong>')
+                           .replace(/{discount}/g, '<strong>20%</strong>');
+
+                document.getElementById('prev-subject').innerText = subject || 'Subject Preview';
+                document.getElementById('prev-body').innerHTML = body || 'Message body will appear here...';
+            }
+
+            document.getElementById('email-selector').addEventListener('change', updateEmailEditor);
+            document.getElementById('email-subject').addEventListener('input', syncPreview);
+            document.getElementById('email-body').addEventListener('input', syncPreview);
+
+            document.getElementById('btn-save-emails').addEventListener('click', async () => {
+                const type = document.getElementById('email-selector').value;
+                window.emailTemplates[type].subject = document.getElementById('email-subject').value;
+                window.emailTemplates[type].body = document.getElementById('email-body').value;
+                
+                try {
+                    await App.saveSettings({
+                        ...App.getCachedSettings(),
+                        email_welcome_subject: window.emailTemplates.welcome.subject,
+                        email_welcome_body: window.emailTemplates.welcome.body,
+                        email_milestone_subject: window.emailTemplates.milestone.subject,
+                        email_milestone_body: window.emailTemplates.milestone.body,
+                        email_tier_subject: window.emailTemplates.tier.subject,
+                        email_tier_body: window.emailTemplates.tier.body
+                    });
+                    App.setAlert("main-view", "Email templates saved successfully!", "success");
+                } catch (e) {
+                    App.setAlert("main-view", "Failed to save emails.");
+                }
+            });
+
+            // --- SAVE SETTINGS ---
             document.getElementById("btn-save-settings").addEventListener("click", async () => {
                 const s = {};
                 s.restaurant_name = document.getElementById("set-name").value.trim();
@@ -778,10 +873,17 @@
                 s.frequencyDays = Number(document.getElementById("set-f-days").value);
                 s.frequencyDiscount = Number(document.getElementById("set-f-disc").value);
 
-                s.milestoneVisits = Number(document.getElementById("set-m-count").value);
-                s.milestoneReward = document.getElementById("set-m-reward").value.trim();
-                
-                s.tierWindowDays = Number(document.getElementById("set-t-window").value);
+                s.milestone_visits = document.getElementById("set-m-count").value;
+                s.milestone_reward = document.getElementById("set-m-reward").value.trim();
+                s.tier_window_days = document.getElementById("set-t-window").value;
+
+                // Sync email fields too
+                s.email_welcome_subject = window.emailTemplates.welcome.subject;
+                s.email_welcome_body = window.emailTemplates.welcome.body;
+                s.email_milestone_subject = window.emailTemplates.milestone.subject;
+                s.email_milestone_body = window.emailTemplates.milestone.body;
+                s.email_tier_subject = window.emailTemplates.tier.subject;
+                s.email_tier_body = window.emailTemplates.tier.body;
 
                 try {
                     await App.saveSettingsData(s);
@@ -819,6 +921,14 @@
                     document.getElementById("set-m-count").value = s.milestone_visits || 5;
                     document.getElementById("set-m-reward").value = s.milestone_reward || '';
                     document.getElementById("set-t-window").value = s.tier_window_days;
+
+                    // Email Designer Setup
+                    window.emailTemplates = {
+                        welcome: { subject: s.email_welcome_subject, body: s.email_welcome_body },
+                        milestone: { subject: s.email_milestone_subject, body: s.email_milestone_body },
+                        tier: { subject: s.email_tier_subject, body: s.email_tier_body }
+                    };
+                    updateEmailEditor();
 
                     const stats = await App.getAdminStats();
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;

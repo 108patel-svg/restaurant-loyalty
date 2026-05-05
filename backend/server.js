@@ -7,6 +7,64 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const sgMail = require('@sendgrid/mail');
+
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+// EMAIL HELPER
+async function sendLoyaltyEmail(to, type, data = {}) {
+  const s = await getSettings();
+  let subject = '';
+  let body = '';
+
+  if (type === 'welcome') {
+    subject = s.email_welcome_subject || 'Welcome to our Loyalty Club!';
+    body = s.email_welcome_body || 'Hi {name}, thanks for joining!';
+  } else if (type === 'milestone') {
+    subject = s.email_milestone_subject || 'You earned a reward!';
+    body = s.email_milestone_body || 'Hi {name}, you earned {reward} after {visits} visits!';
+  } else if (type === 'tier') {
+    subject = s.email_tier_subject || 'You leveled up!';
+    body = s.email_tier_body || 'Hi {name}, you are now {tier} status with {discount}% off!';
+  }
+
+  // Replace placeholders
+  const placeholders = {
+    '{name}': data.name || '',
+    '{reward}': data.reward || '',
+    '{visits}': data.visits || '',
+    '{tier}': (data.tier || '').toUpperCase(),
+    '{discount}': data.discount || '',
+    '{restaurant}': s.restaurant_name || 'The Restaurant'
+  };
+
+  Object.keys(placeholders).forEach(key => {
+    const regex = new RegExp(key, 'g');
+    body = body.replace(regex, placeholders[key]);
+    subject = subject.replace(regex, placeholders[key]);
+  });
+
+  const msg = {
+    to,
+    from: process.env.EMAIL_FROM || s.restaurant_email || 'noreply@loyalty.com',
+    subject,
+    text: body,
+    html: body.replace(/\n/g, '<br>')
+  };
+
+  try {
+    if (process.env.SENDGRID_API_KEY) {
+      await sgMail.send(msg);
+      console.log(`[EMAIL] Sent ${type} email to ${to}`);
+    } else {
+      console.log(`[EMAIL] (DEV MODE) To: ${to}, Sub: ${subject}`);
+    }
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send ${type} email:`, err.message);
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -267,10 +325,27 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
     }
 
     const { newTier, visitCount } = await recalculateTier(customer.id, s);
-    // Calculate best possible discount (Tier vs Retention vs Frequency)
     const discount = await calculateBestDiscount(customer, s, isFirstVisit);
 
-    // Check for Milestone Reward
+    // --- EMAIL TRIGGERS ---
+    if (marketing_consent) {
+        // 1. Welcome Email (First visit only)
+        if (isFirstVisit) {
+            sendLoyaltyEmail(email, 'welcome', { name });
+        }
+        
+        // 2. Tier Up Email
+        if (newTier !== customer.current_tier && newTier !== 'none') {
+            sendLoyaltyEmail(email, 'tier', { name, tier: newTier, discount });
+        }
+
+        // 3. Milestone Email
+        if (s.milestone_visits > 0 && visitCount === s.milestone_visits) {
+            sendLoyaltyEmail(email, 'milestone', { name, reward: s.milestone_reward, visits: visitCount });
+        }
+    }
+
+    // Check for Milestone Reward (for UI display)
     let milestoneEarned = null;
     if (s.milestone_visits > 0 && visitCount >= s.milestone_visits) {
       milestoneEarned = s.milestone_reward;
@@ -442,39 +517,50 @@ app.get('/api/admin/settings', adminAuth, async (req, res) => {
 
 app.put('/api/admin/settings', adminAuth, async (req, res) => {
   const { 
-    restaurantName, restaurantEmail, restaurantAddress, 
-    bronze, silver, gold, 
-    dNew, dBronze, dSilver, dGold, 
-    retentionDays, retentionDiscount, 
-    frequencyVisits, frequencyDays, frequencyDiscount,
-    milestoneVisits, milestoneReward,
-    tierWindowDays,
-    adminPin 
-  } = req.body;
-
-  await run(`
-    UPDATE settings SET 
-      restaurant_name = ?, restaurant_email = ?, restaurant_address = ?,
-      bronze_threshold = ?, silver_threshold = ?, gold_threshold = ?,
-      discount_new = ?, discount_bronze = ?, discount_silver = ?, discount_gold = ?,
-      retention_days = ?, retention_discount = ?,
-      frequency_visits = ?, frequency_days = ?, frequency_discount = ?,
-      milestone_visits = ?, milestone_reward = ?,
-      tier_window_days = ?,
-      admin_pin = COALESCE(NULLIF(?, ''), admin_pin)
-  `, [
-    restaurantName, restaurantEmail, restaurantAddress, 
-    bronze, silver, gold, 
-    dNew, dBronze, dSilver, dGold, 
+    restaurantName, restaurantEmail, restaurantAddress, adminPin,
+    bronze, silver, gold,
+    dNew, dBronze, dSilver, dGold,
     retentionDays, retentionDiscount,
     frequencyVisits, frequencyDays, frequencyDiscount,
     milestoneVisits, milestoneReward,
     tierWindowDays,
-    adminPin
-  ]);
-  
-  auditLog('update_settings', `By admin`);
-  res.json({ success: true });
+    email_welcome_subject, email_welcome_body,
+    email_milestone_subject, email_milestone_body,
+    email_tier_subject, email_tier_body
+  } = req.body;
+
+  try {
+    await run(`
+      UPDATE settings SET 
+        restaurant_name = ?, restaurant_email = ?, restaurant_address = ?, 
+        admin_pin = COALESCE(NULLIF(?, ''), admin_pin),
+        bronze_threshold = ?, silver_threshold = ?, gold_threshold = ?,
+        discount_new = ?, discount_bronze = ?, discount_silver = ?, discount_gold = ?,
+        retention_days = ?, retention_discount = ?,
+        frequency_visits = ?, frequency_days = ?, frequency_discount = ?,
+        milestone_visits = ?, milestone_reward = ?,
+        tier_window_days = ?,
+        email_welcome_subject = ?, email_welcome_body = ?,
+        email_milestone_subject = ?, email_milestone_body = ?,
+        email_tier_subject = ?, email_tier_body = ?
+      WHERE id = 1
+    `, [
+      restaurantName, restaurantEmail, restaurantAddress, adminPin,
+      bronze, silver, gold,
+      dNew, dBronze, dSilver, dGold,
+      retentionDays, retentionDiscount,
+      frequencyVisits, frequencyDays, frequencyDiscount,
+      milestoneVisits, milestoneReward,
+      tierWindowDays,
+      email_welcome_subject, email_welcome_body,
+      email_milestone_subject, email_milestone_body,
+      email_tier_subject, email_tier_body
+    ]);
+    auditLog('update_settings', 'Full settings update including email templates');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/admin/audit-log', adminAuth, async (req, res) => {

@@ -2,112 +2,97 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loyalty Programme | Tablet Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Loyalty Check-in</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --brand: #C4531A;
-            --brand-dark: #1A1410;
-            --bg: #F7F3EE;
-            --text: #1A1410;
+            --cream: #F7F3EE;
+            --dark: #1A1410;
+            --ember: #C4531A;
             --muted: #6B6259;
-            --white: #FFFFFF;
+            --border: rgba(26, 20, 16, 0.12);
+            --brand-dark: #1A1410;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
         body {
-            font-family: 'Outfit', sans-serif;
-            background: #1A1410;
-            color: var(--text);
-            min-height: 100vh;
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--dark);
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
         }
         .container {
-            background: var(--white);
             width: 100%;
-            max-width: 500px;
-            padding: 50px 40px;
-            border-radius: 32px;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+            max-width: 600px;
+            padding: 40px;
             text-align: center;
         }
-        h1 { font-family: 'Playfair Display', serif; font-size: 42px; margin-bottom: 8px; color: var(--brand-dark); }
-        .subtitle { font-size: 16px; color: var(--muted); margin-bottom: 40px; }
-        
-        .form-group { text-align: left; margin-bottom: 24px; }
-        label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; color: var(--muted); }
-        input {
-            width: 100%;
-            height: 64px;
-            padding: 0 20px;
-            border: 2px solid #EEE;
-            border-radius: 16px;
-            font-size: 18px;
-            font-family: inherit;
-            transition: 0.3s;
-        }
-        input:focus { outline: none; border-color: var(--brand); background: #FFF; }
-        
-        .btn-primary {
-            width: 100%;
-            height: 64px;
-            background: var(--brand);
-            color: white;
-            border: none;
-            border-radius: 16px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.3s;
-            margin-top: 10px;
-        }
-        .btn-primary:hover { background: #D86225; transform: translateY(-2px); }
-        
-        .consent-box {
-            display: flex;
-            gap: 15px;
-            margin: 30px 0;
-            padding: 20px;
-            background: #F9F7F5;
-            border-radius: 16px;
-            text-align: left;
-            cursor: pointer;
-        }
-        .consent-box input { width: 24px; height: 24px; accent-color: var(--brand); flex-shrink: 0; cursor: pointer; }
-        .consent-text { font-size: 14px; line-height: 1.4; }
-
         .step { display: none; }
         .step.active { display: block; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .success-badge { display: inline-block; padding: 8px 20px; background: var(--brand-dark); color: #B8924A; border-radius: 99px; font-weight: 600; font-size: 13px; margin-bottom: 20px; }
-        .discount-text { font-size: 28px; font-weight: 700; color: var(--brand); margin: 20px 0; }
+        h1 { font-family: 'Cormorant Garamond', serif; font-size: 3.5rem; font-weight: 500; margin-bottom: 8px; }
+        .subtitle { font-size: 1.1rem; color: var(--muted); margin-bottom: 40px; }
+
+        .form-group { text-align: left; margin-bottom: 24px; }
+        label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+        input {
+            width: 100%;
+            padding: 16px;
+            font-size: 1.2rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--ember); }
+
+        .btn-primary {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            background: var(--ember);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .consent-box { display: flex; align-items: flex-start; gap: 12px; text-align: left; margin: 32px 0; cursor: pointer; }
+        .consent-box input { width: 24px; height: 24px; margin-top: 4px; flex-shrink: 0; }
+        .consent-text { font-size: 0.95rem; line-height: 1.4; color: var(--muted); }
+
+        .result-card { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 20px 40px rgba(26, 20, 16, 0.05); }
+        .tier-badge { display: inline-block; padding: 8px 16px; background: #F0EDE9; border-radius: 100px; font-size: 0.8rem; font-weight: 600; letter-spacing: 1px; margin-bottom: 16px; }
+        .discount-text { font-family: 'Cormorant Garamond', serif; font-size: 4rem; color: var(--ember); margin: 16px 0; }
         
-        .footer-links { margin-top: 40px; font-size: 13px; color: var(--muted); }
-        .footer-links a { color: var(--brand); text-decoration: none; font-weight: 600; }
-        .staff-tag { display: inline-block; margin-top: 20px; font-size: 12px; font-weight: 600; color: var(--brand); opacity: 0.5; }
+        .milestone-banner { background: #E8F5E9; color: #2E7D32; padding: 12px; border-radius: 12px; margin-bottom: 24px; font-weight: 600; font-size: 0.9rem; }
+        .footer-links { margin-top: 32px; font-size: 0.85rem; color: var(--muted); }
+        .footer-links a { color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- STEP 0: Staff - Enter Spend -->
+        <!-- STEP 0: Cashier Input -->
         <div id="step-spend" class="step active">
-            <span class="staff-tag">STAFF ONLY</span>
-            <h1>Enter Spend</h1>
-            <p class="subtitle">Record the total bill amount</p>
+            <h1>Check-in</h1>
+            <p class="subtitle">Enter the bill total to continue</p>
             <div class="form-group">
-                <label>Bill Amount (£)</label>
+                <label>Amount (£)</label>
                 <input type="number" id="spend-amount" step="0.01" placeholder="0.00" autofocus>
             </div>
             <button class="btn-primary" onclick="goToCustomerInfo()">Next &rarr;</button>
-            <div class="footer-links">
-                <a href="admin.html">Go to Admin Dashboard</a>
-            </div>
         </div>
 
         <!-- STEP 1: Customer - Name & Email -->
@@ -127,26 +112,22 @@
                 <label class="consent-box">
                     <input type="checkbox" id="marketing_consent" required>
                     <span class="consent-text">
-                        <strong>I agree to the Terms & Conditions</strong> and would like to receive exclusive rewards and loyalty updates.
-                        <br><small style="color: var(--muted); font-size: 12px;">Unsubscribe at any time. We never share your data.</small>
+                        <strong>I agree to the Terms of Service</strong> and <a href="privacy.html" target="_blank">Privacy Policy</a>.
                     </span>
                 </label>
                 
                 <button type="submit" class="btn-primary" id="btn-submit">Finish Check-in &rarr;</button>
                 <button type="button" class="btn-primary" onclick="resetForm()" style="background: #EEE; color: #666; margin-top: 12px; height: 48px; font-size: 14px;">Cancel</button>
             </form>
-            <div class="footer-links">
-                By continuing, you agree to our <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.
-            </div>
         </div>
 
         <!-- STEP 2: Success -->
-        <div id="step-success" class="step">
-            <h1 id="res-name">Thank you!</h1>
-            <div id="res-tier" class="success-badge">NONE STATUS</div>
-            <div id="milestone-alert" style="display: none; background: #E8F5E9; color: #2E7D32; padding: 16px; border-radius: 12px; border: 1px solid #A5D6A7; margin: 20px 0; font-weight: 600;">
-                🎉 MILESTONE REACHED: <span id="res-milestone"></span>!
+        <div id="step-success" class="step result-card">
+            <div id="milestone-alert" class="milestone-banner" style="display:none;">
+                🎉 MILESTONE REACHED: <span id="res-milestone">Free Dessert</span>
             </div>
+            <div class="tier-badge" id="res-tier">BRONZE STATUS</div>
+            <h1 id="res-name">Thank you!</h1>
             <p class="discount-text" id="res-discount">10% OFF TODAY</p>
             <p class="subtitle">Your rewards have been updated successfully.</p>
             <button class="btn-primary" onclick="resetForm()" style="background: var(--brand-dark);">Next Customer</button>
@@ -162,15 +143,12 @@
                 const configRes = await fetch('/api/config');
                 const config = await configRes.json();
                 RECAPTCHA_SITE_KEY = config.recaptchaSiteKey;
-
                 if (RECAPTCHA_SITE_KEY) {
                     const script = document.createElement('script');
                     script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
                     document.head.appendChild(script);
                 }
-            } catch (err) {
-                console.error("Failed to load config:", err);
-            }
+            } catch (err) {}
         }
         initApp();
 
@@ -184,10 +162,7 @@
 
         function goToCustomerInfo() {
             const amt = document.getElementById('spend-amount').value;
-            if (!amt || amt <= 0) {
-                alert("Please enter a valid bill amount.");
-                return;
-            }
+            if (!amt || amt <= 0) return alert("Enter a valid amount.");
             currentSpend = parseFloat(amt);
             showStep('step-customer');
         }
@@ -217,51 +192,49 @@
             e.preventDefault();
             const btn = document.getElementById('btn-submit');
             btn.disabled = true;
-
             const name = document.getElementById('cust-name').value;
             const email = document.getElementById('cust-email').value;
             const marketing_consent = document.getElementById('marketing_consent').checked;
 
-            grecaptcha.ready(() => {
-                grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'checkin'}).then(async (token) => {
-                    try {
-                        const res = await fetch('/api/checkin-with-spend', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                name, 
-                                email, 
-                                spend: currentSpend,
-                                marketing_consent, 
-                                recaptcha_token: token 
-                            })
-                        });
-                        const data = await res.json();
-                        
-                        if (data.success) {
-                            document.getElementById('res-name').innerText = `Thank you, ${data.name}!`;
-                            document.getElementById('res-tier').innerText = `${data.tier.toUpperCase()} STATUS`;
-                            document.getElementById('res-discount').innerText = `${data.discount}% OFF TODAY`;
-                            
-                            if (data.milestoneReward) {
-                                document.getElementById('res-milestone').innerText = data.milestoneReward;
-                                document.getElementById('milestone-alert').style.display = 'block';
-                            } else {
-                                document.getElementById('milestone-alert').style.display = 'none';
-                            }
-
-                            showStep('step-success');
-                            startAutoReset();
-                        } else {
-                            alert(data.error || "Something went wrong.");
-                            btn.disabled = false;
+            const runCheckin = async (token = '') => {
+                try {
+                    const res = await fetch('/api/checkin-with-spend', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, spend: currentSpend, marketing_consent, recaptcha_token: token })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        document.getElementById('res-name').innerText = `Thank you, ${data.name}!`;
+                        document.getElementById('res-tier').innerText = `${data.tier.toUpperCase()} STATUS`;
+                        document.getElementById('res-discount').innerText = `${data.discount}% OFF TODAY`;
+                        if (data.milestoneReward) {
+                            document.getElementById('res-milestone').innerText = data.milestoneReward;
+                            document.getElementById('milestone-alert').style.display = 'block';
                         }
-                    } catch (err) {
-                        alert("Network error. Please try again.");
+                        showStep('step-success');
+                        startAutoReset();
+                    } else {
+                        alert(data.error || "Error");
                         btn.disabled = false;
                     }
+                } catch (err) {
+                    alert("Network error.");
+                    btn.disabled = false;
+                }
+            };
+
+            if (typeof grecaptcha === 'undefined' || !RECAPTCHA_SITE_KEY) {
+                await runCheckin();
+            } else {
+                grecaptcha.ready(() => {
+                    grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'checkin'}).then(async (token) => {
+                        await runCheckin(token);
+                    }).catch(async () => {
+                        await runCheckin();
+                    });
                 });
-            });
+            }
         });
     </script>
 </body>
