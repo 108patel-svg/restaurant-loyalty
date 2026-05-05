@@ -374,16 +374,18 @@ app.get('/api/status', statusLimiter, async (req, res) => {
     const thresholds = { 'none': s.bronze_threshold, 'bronze': s.silver_threshold, 'silver': s.gold_threshold };
     const nextTierNames = { 'none': 'bronze', 'bronze': 'silver', 'silver': 'gold' };
     
-    const nextTier = nextTierNames[customer.current_tier] || 'gold';
-    const nextThreshold = thresholds[customer.current_tier] || s.gold_threshold;
+    // Use the newly calculated tier, NOT the old one from the DB record
+    const currentTier = stats.newTier || 'none';
+    const nextTier = nextTierNames[currentTier] || 'gold';
+    const nextThreshold = thresholds[currentTier] || s.gold_threshold;
     const progressPercent = Math.min(100, (stats.spend90d / nextThreshold) * 100);
 
-    const discount = await calculateBestDiscount(customer, s);
+    const discount = await calculateBestDiscount({ ...customer, current_tier: currentTier }, s);
 
     res.json({
       found: true,
       name: customer.name,
-      tier: customer.current_tier,
+      tier: currentTier,
       spend90d: stats.spend90d,
       totalVisits: stats.visitCount,
       discount,
