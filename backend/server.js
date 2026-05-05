@@ -472,14 +472,20 @@ app.get('/api/admin/customers', adminAuth, async (req, res) => {
 });
 
 app.delete('/api/admin/customers/:email', adminAuth, async (req, res) => {
-  const { email } = req.params;
-  const customer = await get('SELECT id, name FROM customers WHERE email = ?', [email]);
-  if (customer) {
-    await run('DELETE FROM visits WHERE customer_id = ?', [customer.id]);
-    await run('DELETE FROM customers WHERE id = ?', [customer.id]);
-    auditLog('delete_customer', `Deleted ${customer.name} (${email})`);
+  try {
+    const { email } = req.params;
+    const customer = await get('SELECT id, name FROM customers WHERE email = ?', [email]);
+    if (customer) {
+      await run('DELETE FROM visits WHERE customer_id = ?', [customer.id]);
+      await run('DELETE FROM pending_checkins WHERE customer_id = ?', [customer.id]);
+      await run('DELETE FROM customers WHERE id = ?', [customer.id]);
+      auditLog('delete_customer', `Deleted ${customer.name} (${email})`);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ADMIN] Failed to delete customer:', err.message);
+    res.status(500).json({ error: 'Failed to delete customer' });
   }
-  res.json({ success: true });
 });
 
 app.delete('/api/admin/visits/:id', adminAuth, async (req, res) => {
