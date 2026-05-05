@@ -483,6 +483,7 @@
             <button class="tab" data-tab="tab-activity">Recent activity</button>
             <button class="tab" data-tab="tab-audit">Audit log</button>
             <button class="tab" data-tab="tab-settings">Settings</button>
+            <button class="tab" data-tab="tab-guide">Program Guide</button>
         </div>
 
         <main class="dashboard-content">
@@ -500,10 +501,6 @@
                     <div class="metric-card">
                         <span class="metric-label">Active (Last 90 days)</span>
                         <span class="metric-value" id="stat-active">0</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-label">90-Day Revenue</span>
-                        <span class="metric-value" id="stat-revenue">£0.00</span>
                     </div>
                 </div>
 
@@ -637,6 +634,53 @@
                         </div>
 
                         <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: GUIDE -->
+            <div id="tab-guide" class="tab-pane">
+                <div class="card">
+                    <h2 style="margin-bottom: 24px; font-family: 'Playfair Display', serif;">How Rewards Work</h2>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        <section>
+                            <h3 style="color: var(--brand); margin-bottom: 8px;">1. Loyalty Tiers</h3>
+                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
+                                The system tracks a customer's total spend over the <strong>Tracking Window</strong> (usually 90 days). 
+                                As they spend more, they automatically move from <strong>Bronze</strong> to <strong>Silver</strong> to <strong>Gold</strong>.
+                                They receive their tier's discount on every visit.
+                            </p>
+                        </section>
+
+                        <section>
+                            <h3 style="color: var(--brand); margin-bottom: 8px;">2. Retention Bonus</h3>
+                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
+                                If a customer returns within the <strong>Retention Period</strong> (e.g., 14 days), they receive a higher discount. 
+                                The system always gives them the <strong>best possible discount</strong> between their Tier and this bonus.
+                            </p>
+                        </section>
+
+                        <section>
+                            <h3 style="color: var(--brand); margin-bottom: 8px;">3. Frequency Reward</h3>
+                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
+                                If a customer visits <strong>X times within Y days</strong>, they get a special frequency discount. This encourages them to visit more often in a short period.
+                            </p>
+                        </section>
+
+                        <section>
+                            <h3 style="color: var(--brand); margin-bottom: 8px;">4. Visit Milestones</h3>
+                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
+                                This is a one-time (or repeating) gift. When their total lifetime visit count hits your target (e.g., 10th visit), the tablet will show a <strong>"Milestone Reached"</strong> message with a specific gift like "Free Dessert".
+                            </p>
+                        </section>
+
+                        <section style="background: #F9F7F5; padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                            <h3 style="margin-bottom: 8px;">💡 Pro Tip</h3>
+                            <p style="font-size: 14px; color: var(--muted); line-height: 1.5;">
+                                All these rules are dynamic. If you change a threshold in the <strong>Settings</strong> tab, the app instantly recalculates everyone's status!
+                            </p>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -780,7 +824,6 @@
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
                     document.getElementById("stat-today-cust").innerText = stats.visitedToday;
                     document.getElementById("stat-active").innerText = stats.active90d;
-                    document.getElementById("stat-revenue").innerText = `£${Number(stats.revenue90d || 0).toFixed(2)}`;
 
                     document.getElementById("count-gold").innerText = stats.tierCounts.gold;
                     document.getElementById("count-silver").innerText = stats.tierCounts.silver;
