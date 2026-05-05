@@ -2,6 +2,10 @@
   "name": "loyalty-backend",
   "version": "1.0.0",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node migrate.js"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
