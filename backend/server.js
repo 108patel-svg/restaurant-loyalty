@@ -133,6 +133,8 @@ async function getSettings() {
     frequency_visits: 3,
     frequency_days: 60,
     frequency_discount: 10,
+    milestone_visits: 5,
+    milestone_reward: 'Free Coffee',
     tier_window_days: 90
   };
 }
@@ -263,12 +265,18 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
       await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, spend]);
     }
 
-    const { newTier } = await recalculateTier(customer.id, s);
+    const { newTier, visitCount } = await recalculateTier(customer.id, s);
     // Calculate best possible discount (Tier vs Retention vs Frequency)
     const discount = await calculateBestDiscount(customer, s, isFirstVisit);
 
-    auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}, New: ${isFirstVisit}`);
-    res.json({ success: true, name: customer.name, tier: newTier, discount });
+    // Check for Milestone Reward
+    let milestoneEarned = null;
+    if (s.milestone_visits > 0 && visitCount >= s.milestone_visits) {
+      milestoneEarned = s.milestone_reward;
+    }
+
+    auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}, Milestone: ${milestoneEarned || 'None'}`);
+    res.json({ success: true, name: customer.name, tier: newTier, discount, milestoneReward: milestoneEarned });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "System error." });
@@ -438,6 +446,7 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
     dNew, dBronze, dSilver, dGold, 
     retentionDays, retentionDiscount, 
     frequencyVisits, frequencyDays, frequencyDiscount,
+    milestoneVisits, milestoneReward,
     tierWindowDays,
     adminPin 
   } = req.body;
@@ -449,6 +458,7 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
       discount_new = ?, discount_bronze = ?, discount_silver = ?, discount_gold = ?,
       retention_days = ?, retention_discount = ?,
       frequency_visits = ?, frequency_days = ?, frequency_discount = ?,
+      milestone_visits = ?, milestone_reward = ?,
       tier_window_days = ?,
       admin_pin = COALESCE(NULLIF(?, ''), admin_pin)
   `, [
@@ -457,6 +467,7 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
     dNew, dBronze, dSilver, dGold, 
     retentionDays, retentionDiscount,
     frequencyVisits, frequencyDays, frequencyDiscount,
+    milestoneVisits, milestoneReward,
     tierWindowDays,
     adminPin
   ]);

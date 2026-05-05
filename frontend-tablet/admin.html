@@ -624,9 +624,16 @@
                             <div class="form-row"><label>Reward Discount (%)</label><input type="number" id="set-r-disc"></div>
                             
                             <p style="font-size: 13px; font-weight: 600; margin: 16px 0 12px; color: var(--ember);">2. Frequency Bonus</p>
-                            <div class="form-row"><label>Visit count</label><input type="number" id="set-f-count"></div>
-                            <div class="form-row"><label>Within (days)</label><input type="number" id="set-f-days"></div>
-                            <div class="form-row"><label>Reward Discount (%)</label><input type="number" id="set-f-disc"></div>
+                            <div class="form-row"><label>Visits Target</label><input type="number" id="set-f-count"></div>
+                            <div class="form-row"><label>Tracking Window (days)</label><input type="number" id="set-f-days"></div>
+                            <div class="form-row"><label>Bonus Discount %</label><input type="number" id="set-f-disc"></div>
+                        </div>
+
+                        <h3 style="margin-top: 32px;">Visit Milestones</h3>
+                        <div style="background: rgba(46, 125, 50, 0.03); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                            <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">Reward customers after a specific total number of visits (e.g., 10th visit free).</p>
+                            <div class="form-row"><label>Milestone Target</label><input type="number" id="set-m-count"></div>
+                            <div class="form-row"><label>Reward Description</label><input type="text" id="set-m-reward" placeholder="e.g. Free Dessert"></div>
                         </div>
 
                         <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
@@ -726,6 +733,10 @@
                 s.frequencyVisits = Number(document.getElementById("set-f-count").value);
                 s.frequencyDays = Number(document.getElementById("set-f-days").value);
                 s.frequencyDiscount = Number(document.getElementById("set-f-disc").value);
+
+                s.milestoneVisits = Number(document.getElementById("set-m-count").value);
+                s.milestoneReward = document.getElementById("set-m-reward").value.trim();
+                
                 s.tierWindowDays = Number(document.getElementById("set-t-window").value);
 
                 try {
@@ -749,7 +760,7 @@
                     document.getElementById("set-t-bronze").value = s.bronze_threshold;
                     document.getElementById("set-t-silver").value = s.silver_threshold;
                     document.getElementById("set-t-gold").value = s.gold_threshold;
-                    document.getElementById("set-t-vip").value = s.vip_threshold;
+                    document.getElementById("set-t-window").value = s.tier_window_days;
                     document.getElementById("set-d-new").value = s.discount_new;
                     document.getElementById("set-d-bronze").value = s.discount_bronze;
                     document.getElementById("set-d-silver").value = s.discount_silver;
@@ -760,6 +771,9 @@
                     document.getElementById("set-f-count").value = s.frequency_visits;
                     document.getElementById("set-f-days").value = s.frequency_days;
                     document.getElementById("set-f-disc").value = s.frequency_discount;
+
+                    document.getElementById("set-m-count").value = s.milestone_visits || 5;
+                    document.getElementById("set-m-reward").value = s.milestone_reward || '';
                     document.getElementById("set-t-window").value = s.tier_window_days;
 
                     const stats = await App.getAdminStats();

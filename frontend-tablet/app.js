@@ -55,6 +55,8 @@ const App = (() => {
                 frequencyVisits: settings.frequencyVisits,
                 frequencyDays: settings.frequencyDays,
                 frequencyDiscount: settings.frequencyDiscount,
+                milestoneVisits: settings.milestoneVisits,
+                milestoneReward: settings.milestoneReward,
                 tierWindowDays: settings.tierWindowDays,
                 adminPin: settings.admin_pin
             })
