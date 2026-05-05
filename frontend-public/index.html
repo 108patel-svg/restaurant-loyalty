@@ -215,7 +215,7 @@
                             document.getElementById('disp-name').innerText = data.name;
                             document.getElementById('disp-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
                             document.getElementById('disp-badge').className = `tier-badge tier-${data.tier}`;
-                            document.getElementById('disp-spend').innerText = `£${data.spend90d.toFixed(2)}`;
+                            document.getElementById('disp-spend').innerText = `£${(Number(data.spend90d) || 0).toFixed(2)}`;
                             document.getElementById('disp-visits').innerText = data.totalVisits;
                             document.getElementById('disp-discount').innerText = `${data.discount}% OFF`;
                             document.getElementById('disp-since').innerText = data.consentDate;

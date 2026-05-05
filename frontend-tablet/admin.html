@@ -780,7 +780,7 @@
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
                     document.getElementById("stat-today-cust").innerText = stats.visitedToday;
                     document.getElementById("stat-active").innerText = stats.active90d;
-                    document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
+                    document.getElementById("stat-revenue").innerText = `£${Number(stats.revenue90d || 0).toFixed(2)}`;
 
                     document.getElementById("count-gold").innerText = stats.tierCounts.gold;
                     document.getElementById("count-silver").innerText = stats.tierCounts.silver;
@@ -875,7 +875,7 @@
                             <div class="date">${v.date}</div>
                         </div>
                         <div class="list-right">
-                            <div class="spend">£${parseFloat(v.spend).toFixed(2)}</div>
+                            <div class="spend">£${(parseFloat(v.spend) || 0).toFixed(2)}</div>
                             <div class="badge badge-${v.tier}">${App.tierLabel(v.tier)}</div>
                             <div class="actions" style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;">
                                 <button class="btn-icon" onclick="window.handleEditVisit(${v.id}, ${v.spend})" title="Edit Spend" style="background:none; border:none; color:var(--muted); cursor:pointer;">
