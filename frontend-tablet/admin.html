@@ -835,8 +835,27 @@
                 window.emailTemplates[type].body = document.getElementById('email-body').value;
                 
                 try {
-                    await App.saveSettings({
-                        ...App.getCachedSettings(),
+                    const currentSettings = App.getCachedSettings() || {};
+                    await App.saveSettingsData({
+                        restaurant_name: currentSettings.restaurant_name,
+                        restaurant_email: currentSettings.restaurant_email,
+                        restaurant_address: currentSettings.restaurant_address,
+                        admin_pin: '',
+                        bronze_threshold: currentSettings.bronze_threshold,
+                        silver_threshold: currentSettings.silver_threshold,
+                        gold_threshold: currentSettings.gold_threshold,
+                        discount_new: currentSettings.discount_new,
+                        discount_bronze: currentSettings.discount_bronze,
+                        discount_silver: currentSettings.discount_silver,
+                        discount_gold: currentSettings.discount_gold,
+                        retentionDays: currentSettings.retention_days,
+                        retentionDiscount: currentSettings.retention_discount,
+                        frequencyVisits: currentSettings.frequency_visits,
+                        frequencyDays: currentSettings.frequency_days,
+                        frequencyDiscount: currentSettings.frequency_discount,
+                        milestone_visits: currentSettings.milestone_visits,
+                        milestone_reward: currentSettings.milestone_reward,
+                        tier_window_days: currentSettings.tier_window_days,
                         email_welcome_subject: window.emailTemplates.welcome.subject,
                         email_welcome_body: window.emailTemplates.welcome.body,
                         email_milestone_subject: window.emailTemplates.milestone.subject,
@@ -846,7 +865,7 @@
                     });
                     App.setAlert("main-view", "Email templates saved successfully!", "success");
                 } catch (e) {
-                    App.setAlert("main-view", "Failed to save emails.");
+                    App.setAlert("main-view", "Failed to save emails: " + e.message);
                 }
             });
 

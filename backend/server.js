@@ -315,6 +315,9 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
 
     auditLog('customer_checkin', `${name} (${email})`);
     const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email]);
+
+    // Insert into pending_checkins so the Cashier Dashboard can see this customer
+    await run('INSERT INTO pending_checkins (customer_id) VALUES (?)', [customer.id]);
     
     // Check if customer already existed or is brand new
     const checkNew = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
@@ -589,6 +592,55 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=customers.csv');
   res.send(csv);
+});
+
+// Cashier: Get pending check-ins
+app.get('/api/admin/pending-checkins', adminAuth, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT pc.id, c.name, c.email, c.current_tier as tier, pc.checked_in_at
+      FROM pending_checkins pc
+      JOIN customers c ON pc.customer_id = c.id
+      WHERE pc.spend_recorded = ${isProd ? 'FALSE' : '0'}
+      ORDER BY pc.checked_in_at DESC
+    `);
+    const result = rows.map(r => {
+      const mins = Math.round((Date.now() - new Date(r.checked_in_at + 'Z').getTime()) / 60000);
+      return { ...r, timeAgo: mins };
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('[CASHIER] pending-checkins error:', err.message);
+    res.status(500).json([]);
+  }
+});
+
+// Cashier: Record spend for a pending check-in
+app.post('/api/admin/record-spend', adminAuth, async (req, res) => {
+  const { email, spend } = req.body;
+  if (!email || !spend) return res.status(400).json({ error: "Email and spend are required." });
+
+  try {
+    const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email.toLowerCase().trim()]);
+    if (!customer) return res.status(404).json({ error: "Customer not found." });
+
+    // Record the visit
+    await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, parseFloat(spend)]);
+
+    // Mark pending check-in as completed
+    await run(`UPDATE pending_checkins SET spend_recorded = ${isProd ? 'TRUE' : '1'}, spend_recorded_at = ${getNow()} WHERE customer_id = ? AND spend_recorded = ${isProd ? 'FALSE' : '0'}`, [customer.id]);
+
+    // Recalculate tier
+    const s = await getSettings();
+    const { newTier } = await recalculateTier(customer.id, s);
+    const tierUp = newTier !== customer.current_tier;
+
+    auditLog('record_spend', `${customer.name} (${email}), £${parseFloat(spend).toFixed(2)}, Tier: ${newTier}`);
+    res.json({ success: true, name: customer.name, tier: newTier, tierUp });
+  } catch (err) {
+    console.error('[CASHIER] record-spend error:', err.message);
+    res.status(500).json({ error: "Failed to record spend." });
+  }
 });
 
 // Public Config for reCAPTCHA

@@ -55,10 +55,16 @@ const App = (() => {
                 frequencyVisits: settings.frequencyVisits,
                 frequencyDays: settings.frequencyDays,
                 frequencyDiscount: settings.frequencyDiscount,
-                milestoneVisits: settings.milestoneVisits,
-                milestoneReward: settings.milestoneReward,
-                tierWindowDays: settings.tierWindowDays,
-                adminPin: settings.admin_pin
+                milestoneVisits: settings.milestoneVisits || settings.milestone_visits,
+                milestoneReward: settings.milestoneReward || settings.milestone_reward,
+                tierWindowDays: settings.tierWindowDays || settings.tier_window_days,
+                adminPin: settings.admin_pin,
+                email_welcome_subject: settings.email_welcome_subject,
+                email_welcome_body: settings.email_welcome_body,
+                email_milestone_subject: settings.email_milestone_subject,
+                email_milestone_body: settings.email_milestone_body,
+                email_tier_subject: settings.email_tier_subject,
+                email_tier_body: settings.email_tier_body
             })
         });
         if (!res.ok) throw new Error('Failed to save settings');
