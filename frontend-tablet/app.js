@@ -12,10 +12,18 @@ const App = (() => {
     }
 
     async function fetchSettings() {
-        const res = await fetch('/api/admin/settings', {
-            headers: { 'x-admin-pin': getPin() }
+        // Try header first, then query param as fallback
+        const pin = getPin();
+        let res = await fetch('/api/admin/settings', {
+            headers: { 'x-admin-pin': pin },
+            cache: 'no-store'
         });
-        if (!res.ok) throw new Error('Failed to fetch settings');
+        
+        if (!res.ok) {
+            res = await fetch(`/api/admin/settings?pin=${pin}`, { cache: 'no-store' });
+        }
+
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
         cachedSettings = await res.json();
         return cachedSettings;
     }

