@@ -91,6 +91,17 @@
         .error-msg { display: none; text-align: center; }
         footer { margin-top: auto; padding-top: 40px; display: flex; gap: 24px; font-size: 0.9rem; }
         footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }
+
+        .reward-toggle { background: var(--bg); border-radius: 20px; padding: 20px; margin: 20px 0 32px; }
+        .reward-toggle h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+        .toggle-options { display: flex; gap: 10px; }
+        .toggle-btn {
+            flex: 1; padding: 14px 10px; border-radius: 14px; border: 2px solid transparent;
+            background: white; cursor: pointer; font-family: inherit; font-size: 0.9rem;
+            font-weight: 600; transition: all 0.2s; color: var(--text);
+        }
+        .toggle-btn.active { border-color: var(--brand); background: var(--brand); color: white; }
+        .toggle-btn:hover:not(.active) { border-color: var(--brand); }
     </style>
 </head>
 <body>
@@ -123,9 +134,20 @@
             </div>
         </div>
 
-        <div style="text-align: left; margin-bottom: 32px;">
-            <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 4px;">Current Discount</p>
-            <p id="disp-discount" style="font-size: 2.5rem; font-weight: 600; color: var(--brand-dark);">10% OFF</p>
+        <div id="freebie-section" style="display:none;">
+            <div class="reward-toggle">
+                <h4>Your reward today — choose one:</h4>
+                <div class="toggle-options">
+                    <button class="toggle-btn active" id="btn-discount-opt" onclick="selectReward('discount')">🏷️ <span id="disp-discount">10% OFF</span></button>
+                    <button class="toggle-btn" id="btn-freebie-opt" onclick="selectReward('freebie')">🎁 <span id="disp-freebie">Free Starter</span></button>
+                </div>
+            </div>
+        </div>
+        <div id="discount-only-section">
+            <div style="text-align: left; margin-bottom: 32px;">
+                <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 4px;">Current Discount</p>
+                <p id="disp-discount-only" style="font-size: 2.5rem; font-weight: 600; color: var(--brand-dark);">10% OFF</p>
+            </div>
         </div>
 
         <div id="progress-area" class="progress-section">
@@ -177,6 +199,11 @@
             document.getElementById('btn-check').disabled = false;
         }
 
+        function selectReward(type) {
+            document.getElementById('btn-discount-opt').classList.toggle('active', type === 'discount');
+            document.getElementById('btn-freebie-opt').classList.toggle('active', type === 'freebie');
+        }
+
         document.getElementById('btn-check').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             if (!email || !email.includes('@')) return alert("Enter a valid email.");
@@ -196,9 +223,23 @@
                             document.getElementById('disp-badge').className = `tier-badge tier-${tier}`;
                             document.getElementById('disp-spend').innerText = `£${(data.spend90d || 0).toFixed(2)}`;
                             document.getElementById('disp-visits').innerText = data.totalVisits || 0;
-                            document.getElementById('disp-discount').innerText = `${data.discount || 0}% OFF`;
                             document.getElementById('disp-since').innerText = data.consentDate || 'Unknown';
                             document.getElementById('disp-last').innerText = data.lastVisit || 'Never';
+
+                            // Show freebie toggle or discount-only based on whether a freebie exists
+                            const freebie = data.freebie || '';
+                            const discountText = `${data.discount || 0}% OFF`;
+                            if (freebie && tier !== 'none') {
+                                document.getElementById('freebie-section').style.display = 'block';
+                                document.getElementById('discount-only-section').style.display = 'none';
+                                document.getElementById('disp-discount').innerText = discountText;
+                                document.getElementById('disp-freebie').innerText = freebie;
+                                selectReward('discount');
+                            } else {
+                                document.getElementById('freebie-section').style.display = 'none';
+                                document.getElementById('discount-only-section').style.display = 'block';
+                                document.getElementById('disp-discount-only').innerText = discountText;
+                            }
 
                             if (tier === 'gold') {
                                 document.getElementById('progress-area').style.display = 'none';

@@ -194,7 +194,10 @@ async function getSettings() {
     frequency_discount: 10,
     milestone_visits: 5,
     milestone_reward: 'Free Coffee',
-    tier_window_days: 90
+    tier_window_days: 90,
+    freebie_bronze: '',
+    freebie_silver: '',
+    freebie_gold: ''
   };
 }
 
@@ -264,9 +267,13 @@ async function recalculateTier(customerId, settings) {
   const spend = row.total_90d || 0;
   let tier = 'none';
 
-  if (spend >= settings.gold_threshold) tier = 'gold';
-  else if (spend >= settings.silver_threshold) tier = 'silver';
-  else if (spend >= settings.bronze_threshold) tier = 'bronze';
+  const goldT = Number(settings.gold_threshold) || 1000;
+  const silverT = Number(settings.silver_threshold) || 600;
+  const bronzeT = Number(settings.bronze_threshold) || 300;
+
+  if (goldT > 0 && spend >= goldT) tier = 'gold';
+  else if (silverT > 0 && spend >= silverT) tier = 'silver';
+  else if (bronzeT > 0 && spend >= bronzeT) tier = 'bronze';
 
   await run('UPDATE customers SET current_tier = ? WHERE id = ?', [tier, customerId]);
   return { newTier: tier, spend90d: spend, visitCount: row.visit_count };
@@ -316,8 +323,7 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
     auditLog('customer_checkin', `${name} (${email})`);
     const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email]);
 
-    // Insert into pending_checkins so the Cashier Dashboard can see this customer
-    await run('INSERT INTO pending_checkins (customer_id) VALUES (?)', [customer.id]);
+
     
     // Check if customer already existed or is brand new
     const checkNew = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
@@ -354,8 +360,12 @@ app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
       milestoneEarned = s.milestone_reward;
     }
 
+    // Get freebie for this tier
+    const freebieKey = `freebie_${newTier}`;
+    const freebie = s[freebieKey] || '';
+
     auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}, Milestone: ${milestoneEarned || 'None'}`);
-    res.json({ success: true, name: customer.name, tier: newTier, discount, milestoneReward: milestoneEarned });
+    res.json({ success: true, name: customer.name, tier: newTier, discount, milestoneReward: milestoneEarned, freebie });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "System error." });
@@ -385,6 +395,18 @@ app.get('/api/status', statusLimiter, async (req, res) => {
 
     const discount = await calculateBestDiscount({ ...customer, current_tier: currentTier }, s);
 
+    // Safe date formatting (handles both PostgreSQL Date objects and SQLite strings)
+    const fmtDate = (v, style='date') => {
+      if (!v) return 'Unknown';
+      let d = v instanceof Date ? v : new Date(v);
+      if (isNaN(d.getTime())) d = new Date(v + 'Z');
+      if (isNaN(d.getTime())) return 'Unknown';
+      return style === 'date' ? d.toLocaleDateString('en-GB') : d.toLocaleString('en-GB');
+    };
+
+    const freebieKey = `freebie_${currentTier}`;
+    const freebie = s[freebieKey] || '';
+
     res.json({
       found: true,
       name: customer.name,
@@ -392,8 +414,9 @@ app.get('/api/status', statusLimiter, async (req, res) => {
       spend90d: stats.spend90d,
       totalVisits: stats.visitCount,
       discount,
-      consentDate: new Date(customer.created_at).toLocaleDateString('en-GB'),
-      lastVisit: lastVisit ? new Date(lastVisit.visited_at).toLocaleString('en-GB') : 'Never',
+      freebie,
+      consentDate: fmtDate(customer.created_at),
+      lastVisit: lastVisit ? fmtDate(lastVisit.visited_at, 'datetime') : 'Never',
       nextTier,
       nextThreshold,
       progressPercent
@@ -447,7 +470,11 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
     active90d: active.count,
     revenue90d: revenue.sum || 0,
     tierCounts,
-    recentVisits: recent.map(r => ({ ...r, date: new Date(r.ts + 'Z').toLocaleString('en-GB') }))
+    recentVisits: recent.map(r => {
+      let d = r.ts instanceof Date ? r.ts : new Date(r.ts);
+      if (isNaN(d.getTime())) d = new Date(r.ts + 'Z');
+      return { ...r, date: isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB') };
+    })
   });
 });
 
@@ -494,12 +521,17 @@ app.delete('/api/admin/visits/:id', adminAuth, async (req, res) => {
     const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
     if (visit) {
       await run('DELETE FROM visits WHERE id = ?', [id]);
-      const s = await getSettings();
-      await recalculateTier(visit.customer_id, s);
+      try {
+        const s = await getSettings();
+        await recalculateTier(visit.customer_id, s);
+      } catch (tierErr) {
+        console.error('[ADMIN] Tier recalc after delete failed (non-fatal):', tierErr.message);
+      }
       auditLog('delete_visit', `Visit ID: ${id}`);
     }
     res.json({ success: true });
   } catch (err) {
+    console.error('[ADMIN] Delete visit failed:', err.message);
     res.status(500).json({ error: 'Failed to delete visit' });
   }
 });
@@ -537,7 +569,8 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
     tierWindowDays,
     email_welcome_subject, email_welcome_body,
     email_milestone_subject, email_milestone_body,
-    email_tier_subject, email_tier_body
+    email_tier_subject, email_tier_body,
+    freebie_bronze, freebie_silver, freebie_gold
   } = req.body;
 
   try {
@@ -553,11 +586,12 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
         tier_window_days = ?,
         email_welcome_subject = ?, email_welcome_body = ?,
         email_milestone_subject = ?, email_milestone_body = ?,
-        email_tier_subject = ?, email_tier_body = ?
+        email_tier_subject = ?, email_tier_body = ?,
+        freebie_bronze = ?, freebie_silver = ?, freebie_gold = ?
       WHERE id = 1
     `, [
       restaurantName, restaurantEmail, restaurantAddress, adminPin,
-      bronze, silver, gold,
+      bronze || 300, silver || 600, gold || 1000,
       dNew, dBronze, dSilver, dGold,
       retentionDays, retentionDiscount,
       frequencyVisits, frequencyDays, frequencyDiscount,
@@ -565,7 +599,8 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
       tierWindowDays,
       email_welcome_subject, email_welcome_body,
       email_milestone_subject, email_milestone_body,
-      email_tier_subject, email_tier_body
+      email_tier_subject, email_tier_body,
+      freebie_bronze || '', freebie_silver || '', freebie_gold || ''
     ]);
     auditLog('update_settings', 'Full settings update including email templates');
     res.json({ success: true });
@@ -598,55 +633,6 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=customers.csv');
   res.send(csv);
-});
-
-// Cashier: Get pending check-ins
-app.get('/api/admin/pending-checkins', adminAuth, async (req, res) => {
-  try {
-    const rows = await query(`
-      SELECT pc.id, c.name, c.email, c.current_tier as tier, pc.checked_in_at
-      FROM pending_checkins pc
-      JOIN customers c ON pc.customer_id = c.id
-      WHERE pc.spend_recorded = ${isProd ? 'FALSE' : '0'}
-      ORDER BY pc.checked_in_at DESC
-    `);
-    const result = rows.map(r => {
-      const mins = Math.round((Date.now() - new Date(r.checked_in_at + 'Z').getTime()) / 60000);
-      return { ...r, timeAgo: mins };
-    });
-    res.json(result);
-  } catch (err) {
-    console.error('[CASHIER] pending-checkins error:', err.message);
-    res.status(500).json([]);
-  }
-});
-
-// Cashier: Record spend for a pending check-in
-app.post('/api/admin/record-spend', adminAuth, async (req, res) => {
-  const { email, spend } = req.body;
-  if (!email || !spend) return res.status(400).json({ error: "Email and spend are required." });
-
-  try {
-    const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email.toLowerCase().trim()]);
-    if (!customer) return res.status(404).json({ error: "Customer not found." });
-
-    // Record the visit
-    await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, parseFloat(spend)]);
-
-    // Mark pending check-in as completed
-    await run(`UPDATE pending_checkins SET spend_recorded = ${isProd ? 'TRUE' : '1'}, spend_recorded_at = ${getNow()} WHERE customer_id = ? AND spend_recorded = ${isProd ? 'FALSE' : '0'}`, [customer.id]);
-
-    // Recalculate tier
-    const s = await getSettings();
-    const { newTier } = await recalculateTier(customer.id, s);
-    const tierUp = newTier !== customer.current_tier;
-
-    auditLog('record_spend', `${customer.name} (${email}), £${parseFloat(spend).toFixed(2)}, Tier: ${newTier}`);
-    res.json({ success: true, name: customer.name, tier: newTier, tierUp });
-  } catch (err) {
-    console.error('[CASHIER] record-spend error:', err.message);
-    res.status(500).json({ error: "Failed to record spend." });
-  }
 });
 
 // Public Config for reCAPTCHA

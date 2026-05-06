@@ -41,9 +41,17 @@ async function migrate() {
           email_milestone_subject TEXT DEFAULT 'You earned a reward!',
           email_milestone_body TEXT DEFAULT 'Congratulations {name}! You hit your milestone. Enjoy your {reward} on us!',
           email_tier_subject TEXT DEFAULT 'You have leveled up!',
-          email_tier_body TEXT DEFAULT 'Amazing news {name}! You are now a {tier} member. Enjoy your new discount!'
+          email_tier_body TEXT DEFAULT 'Amazing news {name}! You are now a {tier} member. Enjoy your new discount!',
+          freebie_bronze TEXT DEFAULT '',
+          freebie_silver TEXT DEFAULT '',
+          freebie_gold TEXT DEFAULT ''
         )
       `);
+
+      // Add freebie columns if they don't exist (for existing databases)
+      try { await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS freebie_bronze TEXT DEFAULT ''`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS freebie_silver TEXT DEFAULT ''`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS freebie_gold TEXT DEFAULT ''`); } catch(e) {}
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS customers (
@@ -155,8 +163,16 @@ async function migrate() {
       email_milestone_subject TEXT DEFAULT 'You earned a reward!',
       email_milestone_body TEXT DEFAULT 'Congratulations {name}! You hit your milestone. Enjoy your {reward} on us!',
       email_tier_subject TEXT DEFAULT 'You have leveled up!',
-      email_tier_body TEXT DEFAULT 'Amazing news {name}! You are now a {tier} member. Enjoy your new discount!'
+      email_tier_body TEXT DEFAULT 'Amazing news {name}! You are now a {tier} member. Enjoy your new discount!',
+      freebie_bronze TEXT DEFAULT '',
+      freebie_silver TEXT DEFAULT '',
+      freebie_gold TEXT DEFAULT ''
     )`);
+
+    // Add freebie columns for existing databases
+    try { db.run(`ALTER TABLE settings ADD COLUMN freebie_bronze TEXT DEFAULT ''`); } catch(e) {}
+    try { db.run(`ALTER TABLE settings ADD COLUMN freebie_silver TEXT DEFAULT ''`); } catch(e) {}
+    try { db.run(`ALTER TABLE settings ADD COLUMN freebie_gold TEXT DEFAULT ''`); } catch(e) {}
 
     // Ensure 1 row exists
     db.run(`INSERT OR IGNORE INTO settings (id) VALUES (1)`);

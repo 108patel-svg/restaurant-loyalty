@@ -78,6 +78,11 @@
         .discount-text { font-family: 'Cormorant Garamond', serif; font-size: 4rem; color: var(--ember); margin: 16px 0; }
         
         .milestone-banner { background: #E8F5E9; color: #2E7D32; padding: 12px; border-radius: 12px; margin-bottom: 24px; font-weight: 600; font-size: 0.9rem; }
+        .freebie-card { background: #FFF8E1; border: 2px solid #FFC107; border-radius: 16px; padding: 16px; margin: 16px 0; text-align: center; }
+        .freebie-card .freebie-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #856404; margin-bottom: 6px; }
+        .freebie-card .freebie-options { display: flex; gap: 10px; margin-top: 10px; }
+        .freebie-option-btn { flex: 1; padding: 12px; border-radius: 10px; border: 2px solid #FFC107; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
+        .freebie-option-btn.active { background: #FFC107; color: #333; border-color: #FFC107; }
         .footer-links { margin-top: 32px; font-size: 0.85rem; color: var(--muted); }
         .footer-links a { color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--border); }
     </style>
@@ -129,6 +134,14 @@
             <div class="tier-badge" id="res-tier">BRONZE STATUS</div>
             <h1 id="res-name">Thank you!</h1>
             <p class="discount-text" id="res-discount">10% OFF TODAY</p>
+            <div id="res-freebie-card" class="freebie-card" style="display:none;">
+                <div class="freebie-title">🎁 Or choose your freebie reward</div>
+                <div id="res-freebie-name" style="font-size:1.1rem; font-weight:600; color:#333;">Free Starter</div>
+                <div class="freebie-options">
+                    <button class="freebie-option-btn active" onclick="selectTabletReward('discount',this)">Use Discount</button>
+                    <button class="freebie-option-btn" onclick="selectTabletReward('freebie',this)">Use Freebie</button>
+                </div>
+            </div>
             <p class="subtitle">Your rewards have been updated successfully.</p>
             <button class="btn-primary" onclick="resetForm()" style="background: var(--brand-dark);">Next Customer</button>
             <p id="timer-text" style="margin-top: 24px; font-size: 12px; color: var(--muted);">Resetting in 60s...</p>
@@ -154,6 +167,11 @@
 
         let currentSpend = 0;
         let resetTimer;
+
+        function selectTabletReward(type, btn) {
+            document.querySelectorAll('.freebie-option-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
 
         function showStep(id) {
             document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -211,6 +229,17 @@
                         if (data.milestoneReward) {
                             document.getElementById('res-milestone').innerText = data.milestoneReward;
                             document.getElementById('milestone-alert').style.display = 'block';
+                        } else {
+                            document.getElementById('milestone-alert').style.display = 'none';
+                        }
+                        // Show freebie card if freebie exists
+                        if (data.freebie && data.tier !== 'none') {
+                            document.getElementById('res-freebie-name').innerText = data.freebie;
+                            document.getElementById('res-freebie-card').style.display = 'block';
+                            document.querySelectorAll('.freebie-option-btn').forEach(b => b.classList.remove('active'));
+                            document.querySelector('.freebie-option-btn').classList.add('active');
+                        } else {
+                            document.getElementById('res-freebie-card').style.display = 'none';
                         }
                         showStep('step-success');
                         startAutoReset();

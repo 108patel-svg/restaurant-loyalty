@@ -64,7 +64,10 @@ const App = (() => {
                 email_milestone_subject: settings.email_milestone_subject,
                 email_milestone_body: settings.email_milestone_body,
                 email_tier_subject: settings.email_tier_subject,
-                email_tier_body: settings.email_tier_body
+                email_tier_body: settings.email_tier_body,
+                freebie_bronze: settings.freebie_bronze || '',
+                freebie_silver: settings.freebie_silver || '',
+                freebie_gold: settings.freebie_gold || ''
             })
         });
         if (!res.ok) throw new Error('Failed to save settings');

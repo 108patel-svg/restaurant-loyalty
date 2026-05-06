@@ -615,6 +615,12 @@
                         <div class="form-row"><label>Silver</label><input type="number" id="set-d-silver"></div>
                         <div class="form-row"><label>Gold</label><input type="number" id="set-d-gold"></div>
 
+                        <h3 style="margin-top: 32px;">Tier Freebies</h3>
+                        <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">Optional. Customers can choose between their discount or this freebie each visit.</p>
+                        <div class="form-row"><label>Bronze Freebie</label><input type="text" id="set-fb-bronze" placeholder="e.g. Free Bread" style="width: 200px;"></div>
+                        <div class="form-row"><label>Silver Freebie</label><input type="text" id="set-fb-silver" placeholder="e.g. Free Starter" style="width: 200px;"></div>
+                        <div class="form-row"><label>Gold Freebie</label><input type="text" id="set-fb-gold" placeholder="e.g. Free Dessert" style="width: 200px;"></div>
+
                         <h3 style="margin-top: 32px;">Bonus Rewards</h3>
                         <div style="background: rgba(196, 83, 26, 0.03); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
                             <p style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--ember);">1. Retention Bonus</p>
@@ -636,6 +642,7 @@
 
                         <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
                     </div>
+            </div>
             </div>
 
             <!-- TAB: EMAIL DESIGNER -->
@@ -736,6 +743,24 @@
     <script src="app.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            // Safe date helper for PostgreSQL Date objects and SQLite strings
+            function safeDate(val) {
+                if (!val) return null;
+                if (val instanceof Date && !isNaN(val.getTime())) return val;
+                let d = new Date(val);
+                if (!isNaN(d.getTime())) return d;
+                d = new Date(val + 'Z');
+                if (!isNaN(d.getTime())) return d;
+                return null;
+            }
+            function fmtDate(val) {
+                const d = safeDate(val);
+                return d ? new Intl.DateTimeFormat('en-GB').format(d) : 'Unknown';
+            }
+            function fmtDateTime(val) {
+                const d = safeDate(val);
+                return d ? d.toLocaleString('en-GB') : 'Unknown';
+            }
             let inactivityTimer;
             const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
@@ -896,6 +921,10 @@
                 s.milestone_reward = document.getElementById("set-m-reward").value.trim();
                 s.tier_window_days = document.getElementById("set-t-window").value;
 
+                s.freebie_bronze = document.getElementById("set-fb-bronze").value.trim();
+                s.freebie_silver = document.getElementById("set-fb-silver").value.trim();
+                s.freebie_gold = document.getElementById("set-fb-gold").value.trim();
+
                 // Sync email fields too
                 s.email_welcome_subject = window.emailTemplates.welcome.subject;
                 s.email_welcome_body = window.emailTemplates.welcome.body;
@@ -941,6 +970,10 @@
                     document.getElementById("set-m-reward").value = s.milestone_reward || '';
                     document.getElementById("set-t-window").value = s.tier_window_days;
 
+                    document.getElementById("set-fb-bronze").value = s.freebie_bronze || '';
+                    document.getElementById("set-fb-silver").value = s.freebie_silver || '';
+                    document.getElementById("set-fb-gold").value = s.freebie_gold || '';
+
                     // Email Designer Setup
                     window.emailTemplates = {
                         welcome: { subject: s.email_welcome_subject, body: s.email_welcome_body },
@@ -979,13 +1012,12 @@
                     }
 
                     tbody.innerHTML = customers.map(c => {
-                        const d = new Date(c.created_at);
+                        const d = safeDate(c.created_at);
                         let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
                         if (c.marketing_consent) {
-                            const mDate = new Date(c.consent_date);
                             marketingHtml = `
                                 <div style="color: #2E7D32; font-weight: 500; font-size: 13px;">✓ Opted in</div>
-                                <div style="font-size: 11px; color: var(--muted);">${new Intl.DateTimeFormat('en-GB').format(mDate)}</div>
+                                <div style="font-size: 11px; color: var(--muted);">${fmtDate(c.consent_date)}</div>
                             `;
                         }
 
@@ -999,7 +1031,7 @@
                             <td>${c.visit_count}</td>
                             <td>£${(parseFloat(c.spend_90d) || 0).toFixed(2)}</td>
                             <td>${marketingHtml}</td>
-                            <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
+                            <td>${fmtDate(c.created_at)}</td>
                             <td>
                                 <button class="btn-delete" onclick="window.handleDeleteCustomer('${c.email}')" title="Delete Customer">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
@@ -1025,7 +1057,7 @@
                     }
                     tbody.innerHTML = logs.map(l => `
                         <tr>
-                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${new Date(l.performed_at + 'Z').toLocaleString('en-GB')}</td>
+                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${fmtDateTime(l.performed_at)}</td>
                             <td style="font-weight: 500;">${escapeHTML(l.action)}</td>
                             <td>${escapeHTML(l.details)}</td>
                         </tr>
