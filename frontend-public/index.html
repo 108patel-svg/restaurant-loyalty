@@ -189,24 +189,35 @@
                     const res = await fetch(`/api/status?email=${encodeURIComponent(email)}&recaptcha_token=${token}`);
                     const data = await res.json();
                     if (data.found) {
-                        document.getElementById('lookup-view').style.display = 'none';
-                        document.getElementById('status-view').style.display = 'block';
-                        document.getElementById('disp-name').innerText = data.name;
-                        document.getElementById('disp-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
-                        document.getElementById('disp-badge').className = `tier-badge tier-${data.tier}`;
-                        document.getElementById('disp-spend').innerText = `£${(data.spend90d || 0).toFixed(2)}`;
-                        document.getElementById('disp-visits').innerText = data.totalVisits;
-                        document.getElementById('disp-discount').innerText = `${data.discount}% OFF`;
-                        document.getElementById('disp-since').innerText = data.consentDate;
-                        document.getElementById('disp-last').innerText = data.lastVisit;
+                        try {
+                            const tier = data.tier || 'none';
+                            document.getElementById('disp-name').innerText = data.name || 'Guest';
+                            document.getElementById('disp-badge').innerText = `${tier.toUpperCase()} STATUS`;
+                            document.getElementById('disp-badge').className = `tier-badge tier-${tier}`;
+                            document.getElementById('disp-spend').innerText = `£${(data.spend90d || 0).toFixed(2)}`;
+                            document.getElementById('disp-visits').innerText = data.totalVisits || 0;
+                            document.getElementById('disp-discount').innerText = `${data.discount || 0}% OFF`;
+                            document.getElementById('disp-since').innerText = data.consentDate || 'Unknown';
+                            document.getElementById('disp-last').innerText = data.lastVisit || 'Never';
 
-                        if (data.tier === 'gold') {
-                            document.getElementById('progress-area').style.display = 'none';
-                        } else {
-                            document.getElementById('progress-area').style.display = 'block';
-                            document.getElementById('disp-next').innerText = `NEXT TIER: ${data.nextTier.toUpperCase()}`;
-                            document.getElementById('disp-togo').innerText = `£${(data.nextThreshold - data.spend90d).toFixed(2)} to go`;
-                            setTimeout(() => { document.getElementById('bar-fill').style.width = `${data.progressPercent}%`; }, 200);
+                            if (tier === 'gold') {
+                                document.getElementById('progress-area').style.display = 'none';
+                            } else {
+                                document.getElementById('progress-area').style.display = 'block';
+                                const nextTier = data.nextTier || 'silver';
+                                document.getElementById('disp-next').innerText = `NEXT TIER: ${nextTier.toUpperCase()}`;
+                                const toGo = Math.max(0, (data.nextThreshold || 0) - (data.spend90d || 0));
+                                document.getElementById('disp-togo').innerText = `£${toGo.toFixed(2)} to go`;
+                                setTimeout(() => { document.getElementById('bar-fill').style.width = `${data.progressPercent || 0}%`; }, 200);
+                            }
+
+                            // Show view ONLY if everything succeeded
+                            document.getElementById('lookup-view').style.display = 'none';
+                            document.getElementById('status-view').style.display = 'block';
+                        } catch (domErr) {
+                            console.error("DOM update failed:", domErr);
+                            alert("Lookup failed: Could not display data.");
+                            btn.disabled = false;
                         }
                     } else {
                         document.getElementById('lookup-view').style.display = 'none';
