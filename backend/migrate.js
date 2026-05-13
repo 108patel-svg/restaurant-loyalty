@@ -70,7 +70,7 @@ async function migrate() {
         email_frequency_body TEXT DEFAULT 'Hi {name}, here is a reward for your frequent visits: {reward}!'
       )`);
 
-      await run(`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+      await run(`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET admin_pin = '1234'`);
 
       // Customers Table
       await run(`CREATE TABLE IF NOT EXISTS customers (
@@ -162,6 +162,7 @@ async function migrate() {
       )`);
 
       db.run(`INSERT OR IGNORE INTO settings (id) VALUES (1)`);
+      db.run(`UPDATE settings SET admin_pin = '1234' WHERE id = 1`);
 
       const addCol = (col, type) => {
         db.run(`ALTER TABLE settings ADD COLUMN ${col} ${type}`, (err) => {});

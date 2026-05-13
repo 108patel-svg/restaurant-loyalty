@@ -377,10 +377,12 @@ const adminAuth = async (req, res, next) => {
     }
 
     const s = await getSettings();
-    // String comparison to prevent type mismatch (e.g. "1234" vs 1234)
-    if (String(pin) === String(s.admin_pin)) return next();
+    const providedPin = String(pin);
+    const expectedPin = String(s.admin_pin || '1234');
+
+    if (providedPin === expectedPin) return next();
     
-    console.warn(`[AUTH] Invalid PIN attempt from ${req.ip}`);
+    console.warn(`[AUTH] Invalid PIN. Provided: "${providedPin}", Expected: "${expectedPin}" from ${req.ip}`);
     res.status(401).json({ error: "Invalid PIN" });
   } catch (err) {
     console.error('[AUTH-CRITICAL]', err.message);
