@@ -411,7 +411,7 @@ app.get('/api/admin/stats', adminAuth, safe(async (req, res) => {
     totalCustomers: total.count,
     visitedToday: today.count,
     active90d: active.count,
-    revenue90d: revenue.sum || 0,
+    revenue90d: Number(revenue.sum || 0),
     tierCounts,
     recentVisits: recent.map(r => ({ ...r, date: new Date(r.ts + 'Z').toLocaleString('en-GB') }))
   });

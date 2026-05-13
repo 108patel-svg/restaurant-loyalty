@@ -1034,7 +1034,7 @@
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
                     document.getElementById("stat-today-cust").innerText = stats.visitedToday;
                     document.getElementById("stat-active").innerText = stats.active90d;
-                    document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
+                    document.getElementById("stat-revenue").innerText = `£${Number(stats.revenue90d || 0).toFixed(2)}`;
 
                     document.getElementById("count-vip").innerText = stats.tierCounts.vip;
                     document.getElementById("count-gold").innerText = stats.tierCounts.gold;
