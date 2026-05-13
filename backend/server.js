@@ -107,6 +107,19 @@ const statusLimiter = rateLimit({
   message: { found: false, error: "Too many checks. Please try later." }
 });
 
+// Safe wrapper for async route handlers
+const safe = fn => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(err => {
+    console.error(`[SERVER-ERROR] ${req.method} ${req.url}:`, err);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error", 
+      message: err.message,
+      path: req.url
+    });
+  });
+};
+
 // HELPERS
 async function getSettings() {
   try {
@@ -268,130 +281,114 @@ async function recalculateTier(customerId, settings) {
 }
 
 // ENDPOINTS
-app.post('/api/checkin-with-spend', visitLimiter, async (req, res) => {
+app.post('/api/checkin-with-spend', visitLimiter, safe(async (req, res) => {
   let { name, email, phone, spend, marketing_consent, recaptcha_token } = req.body;
   spend = parseFloat(spend) || 0;
 
   if (!await verifyRecaptcha(recaptcha_token)) return res.status(403).json({ error: "Bot verification failed." });
   if (!email || !email.includes('@')) return res.status(400).json({ error: "Email is required." });
 
-  try {
-    const s = await getSettings();
-    email = email.trim().toLowerCase();
-    name = name.trim();
-
-    await run(
-      `INSERT INTO customers (name, email, phone, marketing_consent, consent_date, consent_ip) 
-       VALUES (?, ?, ?, ?, CASE WHEN ? THEN ${NOW} ELSE NULL END, CASE WHEN ? THEN ? ELSE NULL END)
-       ON CONFLICT (email) DO UPDATE SET 
-         name = EXCLUDED.name,
-         marketing_consent = EXCLUDED.marketing_consent,
-         consent_date = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_date, ${NOW}) ELSE NULL END,
-         consent_ip = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_ip, ?) ELSE NULL END`,
-      [name, email, phone, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, marketing_consent ? 1 : 0, req.ip, req.ip]
-    );
-
-    auditLog('customer_checkin', `${name} (${email})`);
-    const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email]);
-    
-    // Check if customer already existed or is brand new
-    const checkNew = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
-    const isFirstVisit = checkNew.count === 0;
-
-    if (spend > 0) {
-      await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, spend]);
-    }
-
-    const { newTier, spend90d, visitCount } = await recalculateTier(customer.id, s);
-    
-    // Milestone logic
-    let milestoneEarned = null;
-    if (s.enable_milestones && visitCount > 0 && visitCount % (s.milestone_visits || 5) === 0) {
-      milestoneEarned = s.milestone_reward;
-    }
-
-    // Calculate best possible rewards
-    const rewards = await calculateBestRewards(customer, s, isFirstVisit);
-
-    // EMAILS
-    const emailData = {
-      name: customer.name,
-      restaurant: s.restaurant_name,
-      tier: newTier.toUpperCase(),
-      reward: milestoneEarned || rewards.freebie || `${rewards.discount}% OFF`,
-      spend: spend.toFixed(2)
-    };
-
-    if (isFirstVisit) {
-      sendEmail(email, parseTemplate(s.email_welcome_subject, emailData), parseTemplate(s.email_welcome_body, emailData), s);
-    } else if (milestoneEarned) {
-      sendEmail(email, parseTemplate(s.email_milestone_subject, emailData), parseTemplate(s.email_milestone_body, emailData), s);
-    } else if (newTier !== customer.current_tier && newTier !== 'none') {
-      const sub = s[`email_${newTier}_subject`] || s.email_welcome_subject;
-      const body = s[`email_${newTier}_body`] || s.email_welcome_body;
-      sendEmail(email, parseTemplate(sub, emailData), parseTemplate(body, emailData), s);
-    }
-
-    auditLog('checkin_with_spend', `${name}, £${spend.toFixed(2)}, Tier: ${newTier.toUpperCase()}, Milestone: ${milestoneEarned || 'No'}`);
-    res.json({ success: true, name: customer.name, tier: newTier, discount: rewards.discount, freebie: rewards.freebie, milestoneReward: milestoneEarned });
-  } catch (err) {
-    console.error('[CHECKIN] Error:', err);
-    res.status(500).json({ error: "System error." });
-  }
-});
-
-app.get('/api/status', statusLimiter, async (req, res) => {
-  const { email, recaptcha_token } = req.query;
-  if (!await verifyRecaptcha(recaptcha_token)) return res.status(403).json({ error: "Bot verification failed." });
-
-  try {
-    const s = await getSettings();
-    const customer = await get('SELECT * FROM customers WHERE email = ?', [email.toLowerCase().trim()]);
-    if (!customer) return res.json({ found: false });
-
-    const stats = await recalculateTier(customer.id, s);
-    const lastVisit = await get('SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1', [customer.id]);
-
-    const thresholds = { 'none': s.bronze_threshold, 'bronze': s.silver_threshold, 'silver': s.gold_threshold, 'gold': s.vip_threshold };
-    const nextTierNames = { 'none': 'bronze', 'bronze': 'silver', 'silver': 'gold', 'gold': 'vip' };
-    
-    const nextTier = nextTierNames[customer.current_tier] || 'vip';
-    const nextThreshold = thresholds[customer.current_tier] || s.vip_threshold;
-    const progressPercent = Math.min(100, (stats.spend90d / nextThreshold) * 100);
-
-    const rewards = await calculateBestRewards(customer, s);
-
-    res.json({
-      found: true,
-      name: customer.name,
-      tier: customer.current_tier,
-      spend90d: stats.spend90d,
-      totalVisits: stats.visitCount,
-      discount: rewards.discount,
-      freebie: rewards.freebie,
-      enable_discounts: s.enable_discounts,
-      enable_freebies: s.enable_freebies,
-      consentDate: new Date(customer.created_at).toLocaleDateString('en-GB'),
-      lastVisit: lastVisit ? new Date(lastVisit.visited_at).toLocaleString('en-GB') : 'Never',
-      nextTier,
-      nextThreshold,
-      progressPercent
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "System error." });
-  }
-});
-
-// ADMIN
-const adminAuth = async (req, res, next) => {
-  const pin = req.headers['x-admin-pin'];
   const s = await getSettings();
-  if (pin === s.admin_pin) return next();
-  res.status(401).json({ error: "Invalid PIN" });
+  email = email.trim().toLowerCase();
+  name = name.trim();
+
+  // Cross-DB boolean handling
+  const boolVal = marketing_consent ? (isProd ? true : 1) : (isProd ? false : 0);
+
+  await run(
+    `INSERT INTO customers (name, email, phone, marketing_consent, consent_date, consent_ip) 
+     VALUES (?, ?, ?, ?, CASE WHEN ? THEN ${NOW} ELSE NULL END, CASE WHEN ? THEN ? ELSE NULL END)
+     ON CONFLICT (email) DO UPDATE SET 
+       name = EXCLUDED.name,
+       marketing_consent = EXCLUDED.marketing_consent,
+       consent_date = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_date, ${NOW}) ELSE NULL END,
+       consent_ip = CASE WHEN EXCLUDED.marketing_consent THEN COALESCE(customers.consent_ip, ?) ELSE NULL END`,
+    [name, email, phone, boolVal, boolVal, boolVal, req.ip, req.ip]
+  );
+
+  auditLog('customer_checkin', `${name} (${email})`);
+  const customer = await get('SELECT id, name, current_tier FROM customers WHERE email = ?', [email]);
+  
+  // Check if customer already existed or is brand new
+  const checkNew = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
+  const isFirstVisit = checkNew.count === 0;
+
+  // 1. Calculate Rewards (BEFORE adding this visit)
+  const rewards = await calculateBestRewards(customer, s, isFirstVisit);
+  
+  // 2. Add Visit
+  await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, spend]);
+  
+  // 3. Recalculate Tier (AFTER adding this visit)
+  const tierInfo = await recalculateTier(customer.id, s);
+
+  // 4. Send Email if applicable
+  if (tierInfo.newTier !== customer.current_tier && tierInfo.newTier !== 'none') {
+    const templateSubject = s[`email_${tierInfo.newTier}_subject`];
+    const templateBody = s[`email_${tierInfo.newTier}_body`];
+    if (templateSubject && templateBody) {
+      const subject = parseTemplate(templateSubject, { name: customer.name, tier: tierInfo.newTier, restaurant: s.restaurant_name });
+      const body = parseTemplate(templateBody, { name: customer.name, tier: tierInfo.newTier, restaurant: s.restaurant_name });
+      await sendEmail(email, subject, body, s);
+    }
+  }
+
+  res.json({ success: true, rewards, tierInfo });
+}));
+
+app.get('/api/customer-status', statusLimiter, safe(async (req, res) => {
+  const email = req.query.email?.toLowerCase().trim();
+  if (!email) return res.status(400).json({ found: false });
+
+  const s = await getSettings();
+  const customer = await get('SELECT * FROM customers WHERE email = ?', [email]);
+  if (!customer) return res.json({ found: false });
+
+  const tierInfo = await recalculateTier(customer.id, s);
+  const rewards = await calculateBestRewards(customer, s);
+  
+  const visits = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
+  const lastVisit = await get('SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1', [customer.id]);
+  
+  res.json({
+    found: true,
+    name: customer.name,
+    email: customer.email,
+    currentTier: tierInfo.newTier,
+    spend90d: tierInfo.spend90d,
+    visitCount: visits.count,
+    joinedDate: customer.created_at,
+    lastVisited: lastVisit ? lastVisit.visited_at : null,
+    rewards,
+    settings: {
+      bronze: s.bronze_threshold, silver: s.silver_threshold, gold: s.gold_threshold, vip: s.vip_threshold,
+      enableTiers: s.enable_tiers, enableDiscounts: s.enable_discounts, enableFreebies: s.enable_freebies
+    }
+  });
+}));
+
+// ADMIN AUTH
+const adminAuth = async (req, res, next) => {
+  try {
+    const pin = req.headers['x-admin-pin'];
+    if (!pin) {
+      console.warn(`[AUTH] Missing PIN from ${req.ip}`);
+      return res.status(401).json({ error: "PIN required" });
+    }
+
+    const s = await getSettings();
+    // String comparison to prevent type mismatch (e.g. "1234" vs 1234)
+    if (String(pin) === String(s.admin_pin)) return next();
+    
+    console.warn(`[AUTH] Invalid PIN attempt from ${req.ip}`);
+    res.status(401).json({ error: "Invalid PIN" });
+  } catch (err) {
+    console.error('[AUTH-CRITICAL]', err.message);
+    res.status(500).json({ error: "Authentication system failure" });
+  }
 };
 
-app.get('/api/admin/stats', adminAuth, async (req, res) => {
+app.get('/api/admin/stats', adminAuth, safe(async (req, res) => {
   const total = await get('SELECT COUNT(*) as count FROM customers');
   const today = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE ${isProd ? "visited_at::date = CURRENT_DATE" : "DATE(visited_at) = DATE('now')"}`);
   const active = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE visited_at > ${DAYS_90_AGO}`);
@@ -416,9 +413,9 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
     tierCounts,
     recentVisits: recent.map(r => ({ ...r, date: new Date(r.ts + 'Z').toLocaleString('en-GB') }))
   });
-});
+}));
 
-app.get('/api/admin/customers', adminAuth, async (req, res) => {
+app.get('/api/admin/customers', adminAuth, safe(async (req, res) => {
   const { search } = req.query;
   let sql = `
     SELECT c.*, 
@@ -435,9 +432,9 @@ app.get('/api/admin/customers', adminAuth, async (req, res) => {
   sql += ' GROUP BY c.id ORDER BY c.created_at DESC';
   const customers = await query(sql, params);
   res.json(customers);
-});
+}));
 
-app.delete('/api/admin/customers/:email', adminAuth, async (req, res) => {
+app.delete('/api/admin/customers/:email', adminAuth, safe(async (req, res) => {
   const { email } = req.params;
   const customer = await get('SELECT id, name FROM customers WHERE email = ?', [email]);
   if (customer) {
@@ -446,117 +443,95 @@ app.delete('/api/admin/customers/:email', adminAuth, async (req, res) => {
     auditLog('delete_customer', `Deleted ${customer.name} (${email})`);
   }
   res.json({ success: true });
-});
+}));
 
-app.delete('/api/admin/visits/:id', adminAuth, async (req, res) => {
+app.delete('/api/admin/visits/:id', adminAuth, safe(async (req, res) => {
   const { id } = req.params;
-  console.log(`[ADMIN] Attempting to delete visit ID: ${id}`);
-  try {
-    const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
-    if (!visit) {
-      console.log(`[ADMIN] Visit ${id} not found.`);
-      return res.status(404).json({ error: 'Visit not found' });
-    }
-    
+  const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
+  if (visit) {
     await run('DELETE FROM visits WHERE id = ?', [id]);
-    console.log(`[ADMIN] Visit ${id} deleted from DB.`);
-    
+    auditLog('delete_visit', `ID: ${id}`);
     const s = await getSettings();
     await recalculateTier(visit.customer_id, s);
-    
-    auditLog('delete_visit', `Visit ID: ${id}`);
-    res.json({ success: true });
-  } catch (err) {
-    console.error('[ADMIN] Failed to delete visit:', err.message);
-    res.status(500).json({ error: 'Failed to delete visit: ' + err.message });
   }
-});
+  res.json({ success: true });
+}));
 
-app.put('/api/admin/visits/:id/spend', adminAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { spend } = req.body;
-    const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
-    if (visit) {
-      await run('UPDATE visits SET spend = ? WHERE id = ?', [spend, id]);
-      const s = await getSettings();
-      await recalculateTier(visit.customer_id, s);
-      auditLog('update_visit_spend', `Visit ID: ${id}, New: £${spend}`);
-    }
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update visit' });
+app.put('/api/admin/visits/:id/spend', adminAuth, safe(async (req, res) => {
+  const { id } = req.params;
+  const { spend } = req.body;
+  const visit = await get('SELECT customer_id FROM visits WHERE id = ?', [id]);
+  if (visit) {
+    await run('UPDATE visits SET spend = ? WHERE id = ?', [spend, id]);
+    auditLog('edit_visit', `ID: ${id}, New Spend: ${spend}`);
+    const s = await getSettings();
+    await recalculateTier(visit.customer_id, s);
   }
-});
+  res.json({ success: true });
+}));
 
-app.get('/api/admin/settings', adminAuth, async (req, res) => {
+app.get('/api/admin/settings', adminAuth, safe(async (req, res) => {
   const s = await getSettings();
   res.json(s);
-});
+}));
 
-app.put('/api/admin/settings', adminAuth, async (req, res) => {
+app.put('/api/admin/settings', adminAuth, safe(async (req, res) => {
   const fields = req.body;
+  const s = await getSettings();
+  const updates = [];
+  const params = [];
   
-  try {
-    const s = await getSettings();
-    const updates = [];
-    const params = [];
-    
-    // Map of frontend keys to DB columns
-    const keyMap = {
-      restaurantName: 'restaurant_name', restaurantEmail: 'restaurant_email', 
-      restaurantAddress: 'restaurant_address', restaurantLogo: 'restaurant_logo',
-      adminPin: 'admin_pin',
-      enableTiers: 'enable_tiers', enableMilestones: 'enable_milestones', 
-      enableBonus: 'enable_bonus', enableDiscounts: 'enable_discounts', 
-      enableFreebies: 'enable_freebies', enableRetention: 'enable_retention', 
-      enableFrequency: 'enable_frequency',
-      bronze: 'bronze_threshold', silver: 'silver_threshold', 
-      gold: 'gold_threshold', vip: 'vip_threshold',
-      dNew: 'discount_new', dBronze: 'discount_bronze', 
-      dSilver: 'discount_silver', dGold: 'discount_gold', dVip: 'discount_vip',
-      fBronze: 'freebie_bronze', fSilver: 'freebie_silver', 
-      fGold: 'freebie_gold', fVip: 'freebie_vip',
-      retentionDays: 'retention_days', retentionDiscount: 'retention_discount', 
-      retentionFreebie: 'retention_freebie',
-      frequencyVisits: 'frequency_visits', frequencyDays: 'frequency_days', 
-      frequencyDiscount: 'frequency_discount', frequencyFreebie: 'frequency_freebie',
-      milestoneVisits: 'milestone_visits', milestoneReward: 'milestone_reward'
-    };
+  // Map of frontend keys to DB columns
+  const keyMap = {
+    restaurantName: 'restaurant_name', restaurantEmail: 'restaurant_email', 
+    restaurantAddress: 'restaurant_address', restaurantLogo: 'restaurant_logo',
+    adminPin: 'admin_pin',
+    enableTiers: 'enable_tiers', enableMilestones: 'enable_milestones', 
+    enableBonus: 'enable_bonus', enableDiscounts: 'enable_discounts', 
+    enableFreebies: 'enable_freebies', enableRetention: 'enable_retention', 
+    enableFrequency: 'enable_frequency',
+    bronze: 'bronze_threshold', silver: 'silver_threshold', 
+    gold: 'gold_threshold', vip: 'vip_threshold',
+    dNew: 'discount_new', dBronze: 'discount_bronze', 
+    dSilver: 'discount_silver', dGold: 'discount_gold', dVip: 'discount_vip',
+    fBronze: 'freebie_bronze', fSilver: 'freebie_silver', 
+    fGold: 'freebie_gold', fVip: 'freebie_vip',
+    retentionDays: 'retention_days', retentionDiscount: 'retention_discount', 
+    retentionFreebie: 'retention_freebie',
+    frequencyVisits: 'frequency_visits', frequencyDays: 'frequency_days', 
+    frequencyDiscount: 'frequency_discount', frequencyFreebie: 'frequency_freebie',
+    milestoneVisits: 'milestone_visits', milestoneReward: 'milestone_reward'
+  };
 
-    // Add email templates to map
-    ['welcome', 'milestone', 'bronze', 'silver', 'gold', 'vip', 'retention', 'frequency'].forEach(type => {
-      keyMap[`email_${type}_subject`] = `email_${type}_subject`;
-      keyMap[`email_${type}_body`] = `email_${type}_body`;
-    });
+  // Add email templates to map
+  ['welcome', 'milestone', 'bronze', 'silver', 'gold', 'vip', 'retention', 'frequency'].forEach(type => {
+    keyMap[`email_${type}_subject`] = `email_${type}_subject`;
+    keyMap[`email_${type}_body`] = `email_${type}_body`;
+  });
 
-    for (const [feKey, dbCol] of Object.entries(keyMap)) {
-      if (fields[feKey] !== undefined) {
-        let val = fields[feKey];
-        if (feKey === 'adminPin' && val === '') continue; // Skip empty pin
-        updates.push(`${dbCol} = ?`);
-        params.push(val);
-      }
+  for (const [feKey, dbCol] of Object.entries(keyMap)) {
+    if (fields[feKey] !== undefined) {
+      let val = fields[feKey];
+      if (feKey === 'adminPin' && val === '') continue; // Skip empty pin
+      updates.push(`${dbCol} = ?`);
+      params.push(val);
     }
-
-    if (updates.length > 0) {
-      await run(`UPDATE settings SET ${updates.join(', ')} WHERE id = 1`, params);
-    }
-    
-    auditLog('update_settings', `By admin`);
-    res.json({ success: true });
-  } catch (err) {
-    console.error('[ADMIN] Settings update failed:', err.message);
-    res.status(500).json({ error: 'Failed to update settings' });
   }
-});
 
-app.get('/api/admin/audit-log', adminAuth, async (req, res) => {
+  if (updates.length > 0) {
+    await run(`UPDATE settings SET ${updates.join(', ')} WHERE id = 1`, params);
+  }
+  
+  auditLog('update_settings', `By admin`);
+  res.json({ success: true });
+}));
+
+app.get('/api/admin/audit-log', adminAuth, safe(async (req, res) => {
   const logs = await query('SELECT * FROM audit_log ORDER BY performed_at DESC LIMIT 50');
   res.json(logs);
-});
+}));
 
-app.get('/api/admin/export', adminAuth, async (req, res) => {
+app.get('/api/admin/export', adminAuth, safe(async (req, res) => {
   const customers = await query(`
     SELECT name, email, phone, current_tier, 
     (SELECT COUNT(*) FROM visits WHERE customer_id = c.id) as visits,
@@ -575,7 +550,7 @@ app.get('/api/admin/export', adminAuth, async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=customers.csv');
   res.send(csv);
-});
+}));
 
 // CRON: Nightly cleanup at 02:00
 cron.schedule('0 2 * * *', async () => {
