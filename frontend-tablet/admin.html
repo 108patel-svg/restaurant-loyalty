@@ -293,6 +293,12 @@
             border: 1px solid #C8A84B;
         }
 
+        .badge-vip {
+            background: #1A1410;
+            color: #C8A84B;
+            border: 1px solid #8A6A20;
+        }
+
         .table-container {
             background: var(--bg-light);
             border: 1px solid var(--border);
@@ -447,6 +453,79 @@
         .btn-delete:hover {
             background: #FEECEB;
         }
+
+        /* Toggle Switches */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; margin: 0; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s; border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 18px; width: 18px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--ember); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 24px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .section-header h3 { margin: 0; }
+
+        .email-section-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            background: rgba(0,0,0,0.03);
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .email-sub-tab {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 6px;
+            color: var(--muted);
+        }
+        .email-sub-tab.active {
+            background: white;
+            color: var(--dark);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .template-editor {
+            background: #fdfdfd;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .placeholder-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #eee;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 4px;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -482,9 +561,8 @@
             <button class="tab" data-tab="tab-customers">Customers</button>
             <button class="tab" data-tab="tab-activity">Recent activity</button>
             <button class="tab" data-tab="tab-audit">Audit log</button>
-            <button class="tab" data-tab="tab-settings">Settings</button>
             <button class="tab" data-tab="tab-emails">Email Designer</button>
-            <button class="tab" data-tab="tab-guide">Program Guide</button>
+            <button class="tab" data-tab="tab-settings">Settings</button>
         </div>
 
         <main class="dashboard-content">
@@ -500,14 +578,22 @@
                         <span class="metric-value" id="stat-today-cust">0</span>
                     </div>
                     <div class="metric-card">
-                        <span class="metric-label">Active (Recent)</span>
+                        <span class="metric-label">Active (Last 90 days)</span>
                         <span class="metric-value" id="stat-active">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">90-Day Revenue</span>
+                        <span class="metric-value" id="stat-revenue">£0.00</span>
                     </div>
                 </div>
 
                 <div class="tier-breakdown">
                     <h3>Tier breakdown</h3>
                     <div class="tier-grid">
+                        <div class="tier-stat">
+                            <div class="count" id="count-vip">0</div>
+                            <div class="badge badge-vip">VIP</div>
+                        </div>
                         <div class="tier-stat">
                             <div class="count" id="count-gold">0</div>
                             <div class="badge badge-gold">GOLD</div>
@@ -540,7 +626,7 @@
                                 <th>Customer</th>
                                 <th>Tier</th>
                                 <th>Visits</th>
-                                <th>Spend (Window)</th>
+                                <th>90-Day Spend</th>
                                 <th>Marketing</th>
                                 <th>Member Since</th>
                                 <th style="width: 100px;">Actions</th>
@@ -593,148 +679,115 @@
                             <input type="email" id="set-email" style="width: 200px;">
                         </div>
                         <div class="form-row">
-                            <label>Restaurant Address</label>
-                            <input type="text" id="set-address" style="width: 200px;">
+                            <label>Logo URL</label>
+                            <input type="text" id="set-logo" style="width: 200px;" placeholder="https://...">
                         </div>
                         <div class="form-row">
                             <label>Admin PIN (leave blank to keep)</label>
                             <input type="password" id="set-pin" style="width: 200px;" placeholder="****">
                         </div>
 
-                        <h3 style="margin-top: 32px;">Thresholds (£ in 90 days)</h3>
-                        <div class="form-row"><label>Bronze</label><input type="number" id="set-t-bronze"></div>
-                        <div class="form-row"><label>Silver</label><input type="number" id="set-t-silver"></div>
-                        <div class="form-row"><label>Gold</label><input type="number" id="set-t-gold"></div>
-                        <div class="form-row"><label>Review Period (days)</label><input type="number" id="set-t-window"></div>
+                        <div class="section-header">
+                            <h3>Tier System</h3>
+                            <label class="switch"><input type="checkbox" id="set-enable-tiers"><span class="slider"></span></label>
+                        </div>
+                        <div class="form-row">
+                            <label>Enable Discounts</label>
+                            <label class="switch"><input type="checkbox" id="set-enable-discounts"><span class="slider"></span></label>
+                        </div>
+                        <div class="form-row">
+                            <label>Enable Freebies</label>
+                            <label class="switch"><input type="checkbox" id="set-enable-freebies"><span class="slider"></span></label>
+                        </div>
+
+                        <div class="form-row"><label>Bronze Threshold (£)</label><input type="number" id="set-t-bronze"></div>
+                        <div class="form-row"><label>Silver Threshold (£)</label><input type="number" id="set-t-silver"></div>
+                        <div class="form-row"><label>Gold Threshold (£)</label><input type="number" id="set-t-gold"></div>
+                        <div class="form-row"><label>VIP Threshold (£)</label><input type="number" id="set-t-vip"></div>
                     </div>
 
                     <div class="settings-card">
-                        <h3>Discounts (%)</h3>
-                        <div class="form-row"><label>New Customer</label><input type="number" id="set-d-new"></div>
-                        <div class="form-row"><label>Bronze</label><input type="number" id="set-d-bronze"></div>
-                        <div class="form-row"><label>Silver</label><input type="number" id="set-d-silver"></div>
-                        <div class="form-row"><label>Gold</label><input type="number" id="set-d-gold"></div>
+                        <h3>Reward Options</h3>
+                        <table style="width:100%; border:none; margin-bottom:16px;">
+                            <thead><tr><th>Tier</th><th>Disc %</th><th>Freebie Item</th></tr></thead>
+                            <tbody>
+                                <tr><td>New</td><td><input type="number" id="set-d-new" style="width:60px;"></td><td>-</td></tr>
+                                <tr><td>Bronze</td><td><input type="number" id="set-d-bronze" style="width:60px;"></td><td><input type="text" id="set-f-bronze" style="width:100px;"></td></tr>
+                                <tr><td>Silver</td><td><input type="number" id="set-d-silver" style="width:60px;"></td><td><input type="text" id="set-f-silver" style="width:100px;"></td></tr>
+                                <tr><td>Gold</td><td><input type="number" id="set-d-gold" style="width:60px;"></td><td><input type="text" id="set-f-gold" style="width:100px;"></td></tr>
+                                <tr><td>VIP</td><td><input type="number" id="set-d-vip" style="width:60px;"></td><td><input type="text" id="set-f-vip" style="width:100px;"></td></tr>
+                            </tbody>
+                        </table>
 
-                        <h3 style="margin-top: 32px;">Tier Freebies</h3>
-                        <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">Optional. Customers can choose between their discount or this freebie each visit.</p>
-                        <div class="form-row"><label>Bronze Freebie</label><input type="text" id="set-fb-bronze" placeholder="e.g. Free Bread" style="width: 200px;"></div>
-                        <div class="form-row"><label>Silver Freebie</label><input type="text" id="set-fb-silver" placeholder="e.g. Free Starter" style="width: 200px;"></div>
-                        <div class="form-row"><label>Gold Freebie</label><input type="text" id="set-fb-gold" placeholder="e.g. Free Dessert" style="width: 200px;"></div>
-
-                        <h3 style="margin-top: 32px;">Bonus Rewards</h3>
-                        <div style="background: rgba(196, 83, 26, 0.03); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                            <p style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--ember);">1. Retention Bonus</p>
-                            <div class="form-row"><label>Return within (days)</label><input type="number" id="set-r-days"></div>
-                            <div class="form-row"><label>Reward Discount (%)</label><input type="number" id="set-r-disc"></div>
-                            
-                            <p style="font-size: 13px; font-weight: 600; margin: 16px 0 12px; color: var(--ember);">2. Frequency Bonus</p>
-                            <div class="form-row"><label>Visits Target</label><input type="number" id="set-f-count"></div>
-                            <div class="form-row"><label>Tracking Window (days)</label><input type="number" id="set-f-days"></div>
-                            <div class="form-row"><label>Bonus Discount %</label><input type="number" id="set-f-disc"></div>
+                        <div class="section-header">
+                            <h3>Bonus Rewards</h3>
+                            <label class="switch"><input type="checkbox" id="set-enable-bonus"><span class="slider"></span></label>
                         </div>
-
-                        <h3 style="margin-top: 32px;">Visit Milestones</h3>
-                        <div style="background: rgba(46, 125, 50, 0.03); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                            <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">Reward customers after a specific total number of visits (e.g., 10th visit free).</p>
-                            <div class="form-row"><label>Milestone Target</label><input type="number" id="set-m-count"></div>
-                            <div class="form-row"><label>Reward Description</label><input type="text" id="set-m-reward" placeholder="e.g. Free Dessert"></div>
-                        </div>
-
-                        <button class="primary" id="btn-save-settings" style="width: 100%;">Save Settings</button>
-                    </div>
-            </div>
-            </div>
-
-            <!-- TAB: EMAIL DESIGNER -->
-            <div id="tab-emails" class="tab-pane">
-                <div class="card">
-                    <h2 style="margin-bottom: 24px; font-family: 'Playfair Display', serif;">Email Designer</h2>
-                    <p style="color: var(--muted); margin-bottom: 30px;">Type your messages below. Use {name}, {reward}, or {tier} to insert customer data.</p>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-                        <!-- Editor -->
-                        <div style="display: flex; flex-direction: column; gap: 30px;">
-                            <div class="email-section">
-                                <label style="display:block; margin-bottom:8px; font-weight:600;">Template Type</label>
-                                <select id="email-selector" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
-                                    <option value="welcome">Welcome Email</option>
-                                    <option value="milestone">Milestone Reward</option>
-                                    <option value="tier">Level Up (Tier)</option>
-                                </select>
-
-                                <div class="form-group">
-                                    <label>Subject Line</label>
-                                    <input type="text" id="email-subject" style="width:100%;" placeholder="Subject">
-                                </div>
-                                <div class="form-group" style="margin-top:15px;">
-                                    <label>Message Body</label>
-                                    <textarea id="email-body" style="width:100%; height:200px; padding:15px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px;"></textarea>
-                                </div>
-                                <button class="primary" id="btn-save-emails" style="width:100%; margin-top:10px;">Save This Template</button>
+                        <div style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px;">
+                            <div class="form-row">
+                                <label>Retention (Miss you)</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-retention"><span class="slider"></span></label>
                             </div>
+                            <div class="form-row"><label>Within (days)</label><input type="number" id="set-r-days"></div>
+                            <div class="form-row"><label>Disc (%)</label><input type="number" id="set-r-disc"></div>
+                            <div class="form-row"><label>Freebie</label><input type="text" id="set-r-free" style="width:100px;"></div>
+
+                            <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);">
+
+                            <div class="form-row">
+                                <label>Frequency (Regular)</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-frequency"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row"><label>Visits</label><input type="number" id="set-f-count"></div>
+                            <div class="form-row"><label>Days</label><input type="number" id="set-f-days"></div>
+                            <div class="form-row"><label>Disc (%)</label><input type="number" id="set-f-disc"></div>
+                            <div class="form-row"><label>Freebie</label><input type="text" id="set-f-free" style="width:100px;"></div>
                         </div>
 
-                        <!-- Mobile Preview -->
-                        <div style="background: #F4F1EE; padding: 30px; border-radius: 24px; border: 1px solid var(--border); display: flex; justify-content: center;">
-                            <div style="width: 280px; height: 500px; background: white; border: 12px solid #1A1410; border-radius: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); position: relative; overflow: hidden; padding: 20px;">
-                                <div style="width: 60px; height: 4px; background: #333; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); border-radius: 2px;"></div>
-                                <div style="margin-top: 30px; border-bottom: 1px solid #EEE; padding-bottom: 15px; margin-bottom: 15px;">
-                                    <div id="prev-subject" style="font-weight: 700; font-size: 14px; color: #1A1410;">Subject Preview</div>
-                                </div>
-                                <div id="prev-body" style="font-size: 13px; line-height: 1.6; color: #444; white-space: pre-wrap;">Message body will appear here...</div>
-                                <div style="position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; font-size: 10px; color: #AAA; padding: 0 20px;">
-                                    You received this because you joined the loyalty club. <a href="#" style="color: var(--brand); text-decoration: none;">Unsubscribe</a>
-                                </div>
-                            </div>
+                        <div class="section-header">
+                            <h3>Milestones</h3>
+                            <label class="switch"><input type="checkbox" id="set-enable-milestones"><span class="slider"></span></label>
                         </div>
+                        <div class="form-row"><label>Every X visits</label><input type="number" id="set-m-visits"></div>
+                        <div class="form-row"><label>Reward Item</label><input type="text" id="set-m-reward" style="width:120px;"></div>
+
+                        <button class="primary" id="btn-save-settings" style="width: 100%;">Save All Settings</button>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB: GUIDE -->
-            <div id="tab-guide" class="tab-pane">
-                <div class="card">
-                    <h2 style="margin-bottom: 24px; font-family: 'Playfair Display', serif;">How Rewards Work</h2>
+            <!-- Email Designer Tab -->
+            <div id="tab-emails" class="tab-pane">
+                <div class="settings-card" style="max-width:800px; margin:0 auto;">
+                    <h3>Email Designer</h3>
+                    <p style="font-size:13px; color:var(--muted); margin-bottom:20px;">Design custom emails for every reward stage. Use placeholders: <span class="placeholder-tag">{name}</span> <span class="placeholder-tag">{tier}</span> <span class="placeholder-tag">{reward}</span> <span class="placeholder-tag">{restaurant}</span></p>
                     
-                    <div style="display: flex; flex-direction: column; gap: 24px;">
-                        <section>
-                            <h3 style="color: var(--brand); margin-bottom: 8px;">1. Loyalty Tiers</h3>
-                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
-                                The system tracks a customer's total spend over the <strong>Tracking Window</strong> (usually 90 days). 
-                                As they spend more, they automatically move from <strong>Bronze</strong> to <strong>Silver</strong> to <strong>Gold</strong>.
-                                They receive their tier's discount on every visit.
-                            </p>
-                        </section>
-
-                        <section>
-                            <h3 style="color: var(--brand); margin-bottom: 8px;">2. Retention Bonus</h3>
-                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
-                                If a customer returns within the <strong>Retention Period</strong> (e.g., 14 days), they receive a higher discount. 
-                                The system always gives them the <strong>best possible discount</strong> between their Tier and this bonus.
-                            </p>
-                        </section>
-
-                        <section>
-                            <h3 style="color: var(--brand); margin-bottom: 8px;">3. Frequency Reward</h3>
-                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
-                                If a customer visits <strong>X times within Y days</strong>, they get a special frequency discount. This encourages them to visit more often in a short period.
-                            </p>
-                        </section>
-
-                        <section>
-                            <h3 style="color: var(--brand); margin-bottom: 8px;">4. Visit Milestones</h3>
-                            <p style="font-size: 15px; color: var(--muted); line-height: 1.6;">
-                                This is a one-time (or repeating) gift. When their total lifetime visit count hits your target (e.g., 10th visit), the tablet will show a <strong>"Milestone Reached"</strong> message with a specific gift like "Free Dessert".
-                            </p>
-                        </section>
-
-                        <section style="background: #F9F7F5; padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-                            <h3 style="margin-bottom: 8px;">💡 Pro Tip</h3>
-                            <p style="font-size: 14px; color: var(--muted); line-height: 1.5;">
-                                All these rules are dynamic. If you change a threshold in the <strong>Settings</strong> tab, the app instantly recalculates everyone's status!
-                            </p>
-                        </section>
+                    <div class="email-section-tabs">
+                        <button class="email-sub-tab active" data-email="welcome">Welcome</button>
+                        <button class="email-sub-tab" data-email="bronze">Bronze</button>
+                        <button class="email-sub-tab" data-email="silver">Silver</button>
+                        <button class="email-sub-tab" data-email="gold">Gold</button>
+                        <button class="email-sub-tab" data-email="vip">VIP</button>
+                        <button class="email-sub-tab" data-email="milestone">Milestone</button>
+                        <button class="email-sub-tab" data-email="retention">Retention</button>
+                        <button class="email-sub-tab" data-email="frequency">Frequency</button>
                     </div>
+
+                    <div class="template-editor">
+                        <div class="form-row">
+                            <label>Subject Line</label>
+                            <input type="text" id="email-subject" style="width:100%;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:16px;">
+                            <label>Message Body</label>
+                            <textarea id="email-body" style="width:100%; height:200px; padding:12px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px; margin-top:8px; resize:vertical;"></textarea>
+                        </div>
+                        <div class="form-row" style="justify-content: flex-start; gap:10px;">
+                            <button class="nav-btn" onclick="insertImage()">Insert Logo/Image</button>
+                            <button class="nav-btn" onclick="previewEmail()">Preview Design</button>
+                        </div>
+                    </div>
+                    <button class="primary" id="btn-save-emails" style="margin-top:20px;">Save All Templates</button>
                 </div>
             </div>
         </main>
@@ -743,24 +796,6 @@
     <script src="app.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // Safe date helper for PostgreSQL Date objects and SQLite strings
-            function safeDate(val) {
-                if (!val) return null;
-                if (val instanceof Date && !isNaN(val.getTime())) return val;
-                let d = new Date(val);
-                if (!isNaN(d.getTime())) return d;
-                d = new Date(val + 'Z');
-                if (!isNaN(d.getTime())) return d;
-                return null;
-            }
-            function fmtDate(val) {
-                const d = safeDate(val);
-                return d ? new Intl.DateTimeFormat('en-GB').format(d) : 'Unknown';
-            }
-            function fmtDateTime(val) {
-                const d = safeDate(val);
-                return d ? d.toLocaleString('en-GB') : 'Unknown';
-            }
             let inactivityTimer;
             const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
@@ -791,8 +826,7 @@
                         document.getElementById("view-dashboard").style.display = "block";
                         resetInactivityTimer();
                     } catch (err) {
-                        console.error("Login failed:", err);
-                        App.setAlert("login-alert", `Login failed: ${err.message}`, "error");
+                        App.setAlert("login-alert", "Incorrect PIN or server error", "error");
                         pinInput.value = "";
                     }
                 } catch (err) {
@@ -827,121 +861,124 @@
                 await renderCustomers();
             });
 
-            // --- EMAIL DESIGNER LOGIC ---
-            function updateEmailEditor() {
-                const type = document.getElementById('email-selector').value;
-                const template = window.emailTemplates[type];
-                document.getElementById('email-subject').value = template.subject || '';
-                document.getElementById('email-body').value = template.body || '';
-                syncPreview();
-            }
-
-            function syncPreview() {
-                const subject = document.getElementById('email-subject').value;
-                let body = document.getElementById('email-body').value;
-                
-                // Demo placeholders
-                body = body.replace(/{name}/g, '<strong>John Doe</strong>')
-                           .replace(/{reward}/g, '<strong>Free Dessert</strong>')
-                           .replace(/{tier}/g, '<strong>Gold</strong>')
-                           .replace(/{discount}/g, '<strong>20%</strong>');
-
-                document.getElementById('prev-subject').innerText = subject || 'Subject Preview';
-                document.getElementById('prev-body').innerHTML = body || 'Message body will appear here...';
-            }
-
-            document.getElementById('email-selector').addEventListener('change', updateEmailEditor);
-            document.getElementById('email-subject').addEventListener('input', syncPreview);
-            document.getElementById('email-body').addEventListener('input', syncPreview);
-
-            document.getElementById('btn-save-emails').addEventListener('click', async () => {
-                const type = document.getElementById('email-selector').value;
-                window.emailTemplates[type].subject = document.getElementById('email-subject').value;
-                window.emailTemplates[type].body = document.getElementById('email-body').value;
-                
-                try {
-                    const currentSettings = App.getCachedSettings() || {};
-                    await App.saveSettingsData({
-                        restaurant_name: currentSettings.restaurant_name,
-                        restaurant_email: currentSettings.restaurant_email,
-                        restaurant_address: currentSettings.restaurant_address,
-                        admin_pin: '',
-                        bronze_threshold: currentSettings.bronze_threshold,
-                        silver_threshold: currentSettings.silver_threshold,
-                        gold_threshold: currentSettings.gold_threshold,
-                        discount_new: currentSettings.discount_new,
-                        discount_bronze: currentSettings.discount_bronze,
-                        discount_silver: currentSettings.discount_silver,
-                        discount_gold: currentSettings.discount_gold,
-                        retentionDays: currentSettings.retention_days,
-                        retentionDiscount: currentSettings.retention_discount,
-                        frequencyVisits: currentSettings.frequency_visits,
-                        frequencyDays: currentSettings.frequency_days,
-                        frequencyDiscount: currentSettings.frequency_discount,
-                        milestone_visits: currentSettings.milestone_visits,
-                        milestone_reward: currentSettings.milestone_reward,
-                        tier_window_days: currentSettings.tier_window_days,
-                        email_welcome_subject: window.emailTemplates.welcome.subject,
-                        email_welcome_body: window.emailTemplates.welcome.body,
-                        email_milestone_subject: window.emailTemplates.milestone.subject,
-                        email_milestone_body: window.emailTemplates.milestone.body,
-                        email_tier_subject: window.emailTemplates.tier.subject,
-                        email_tier_body: window.emailTemplates.tier.body
-                    });
-                    App.setAlert("main-view", "Email templates saved successfully!", "success");
-                } catch (e) {
-                    App.setAlert("main-view", "Failed to save emails: " + e.message);
-                }
-            });
-
-            // --- SAVE SETTINGS ---
             document.getElementById("btn-save-settings").addEventListener("click", async () => {
                 const s = {};
-                s.restaurant_name = document.getElementById("set-name").value.trim();
-                s.restaurant_email = document.getElementById("set-email").value.trim();
-                s.restaurant_address = document.getElementById("set-address").value.trim();
-                s.admin_pin = document.getElementById("set-pin").value.trim();
+                s.restaurantName = document.getElementById("set-name").value.trim();
+                s.restaurantEmail = document.getElementById("set-email").value.trim();
+                s.restaurantLogo = document.getElementById("set-logo").value.trim();
+                s.adminPin = document.getElementById("set-pin").value.trim();
 
-                s.bronze_threshold = Number(document.getElementById("set-t-bronze").value);
-                s.silver_threshold = Number(document.getElementById("set-t-silver").value);
-                s.gold_threshold = Number(document.getElementById("set-t-gold").value);
+                s.enableTiers = document.getElementById("set-enable-tiers").checked ? 1 : 0;
+                s.enableDiscounts = document.getElementById("set-enable-discounts").checked ? 1 : 0;
+                s.enableFreebies = document.getElementById("set-enable-freebies").checked ? 1 : 0;
+                s.enableBonus = document.getElementById("set-enable-bonus").checked ? 1 : 0;
+                s.enableRetention = document.getElementById("set-enable-retention").checked ? 1 : 0;
+                s.enableFrequency = document.getElementById("set-enable-frequency").checked ? 1 : 0;
+                s.enableMilestones = document.getElementById("set-enable-milestones").checked ? 1 : 0;
 
-                s.discount_new = Number(document.getElementById("set-d-new").value);
-                s.discount_bronze = Number(document.getElementById("set-d-bronze").value);
-                s.discount_silver = Number(document.getElementById("set-d-silver").value);
-                s.discount_gold = Number(document.getElementById("set-d-gold").value);
+                s.bronze = Number(document.getElementById("set-t-bronze").value);
+                s.silver = Number(document.getElementById("set-t-silver").value);
+                s.gold = Number(document.getElementById("set-t-gold").value);
+                s.vip = Number(document.getElementById("set-t-vip").value);
+
+                s.dNew = Number(document.getElementById("set-d-new").value);
+                s.dBronze = Number(document.getElementById("set-d-bronze").value);
+                s.dSilver = Number(document.getElementById("set-d-silver").value);
+                s.dGold = Number(document.getElementById("set-d-gold").value);
+                s.dVip = Number(document.getElementById("set-d-vip").value);
+
+                s.fBronze = document.getElementById("set-f-bronze").value.trim();
+                s.fSilver = document.getElementById("set-f-silver").value.trim();
+                s.fGold = document.getElementById("set-f-gold").value.trim();
+                s.fVip = document.getElementById("set-f-vip").value.trim();
 
                 s.retentionDays = Number(document.getElementById("set-r-days").value);
                 s.retentionDiscount = Number(document.getElementById("set-r-disc").value);
+                s.retentionFreebie = document.getElementById("set-r-free").value.trim();
+
                 s.frequencyVisits = Number(document.getElementById("set-f-count").value);
                 s.frequencyDays = Number(document.getElementById("set-f-days").value);
                 s.frequencyDiscount = Number(document.getElementById("set-f-disc").value);
+                s.frequencyFreebie = document.getElementById("set-f-free").value.trim();
 
-                s.milestone_visits = document.getElementById("set-m-count").value;
-                s.milestone_reward = document.getElementById("set-m-reward").value.trim();
-                s.tier_window_days = document.getElementById("set-t-window").value;
-
-                s.freebie_bronze = document.getElementById("set-fb-bronze").value.trim();
-                s.freebie_silver = document.getElementById("set-fb-silver").value.trim();
-                s.freebie_gold = document.getElementById("set-fb-gold").value.trim();
-
-                // Sync email fields too
-                s.email_welcome_subject = window.emailTemplates.welcome.subject;
-                s.email_welcome_body = window.emailTemplates.welcome.body;
-                s.email_milestone_subject = window.emailTemplates.milestone.subject;
-                s.email_milestone_body = window.emailTemplates.milestone.body;
-                s.email_tier_subject = window.emailTemplates.tier.subject;
-                s.email_tier_body = window.emailTemplates.tier.body;
+                s.milestoneVisits = Number(document.getElementById("set-m-visits").value);
+                s.milestoneReward = document.getElementById("set-m-reward").value.trim();
 
                 try {
                     await App.saveSettingsData(s);
                     App.setAlert("settings-alert", "Settings saved successfully", "success");
-                    document.getElementById("nav-restaurant-name").innerText = s.restaurant_name;
+                    document.getElementById("nav-restaurant-name").innerText = s.restaurantName;
                     document.getElementById("set-pin").value = "";
                 } catch (e) {
                     App.setAlert("settings-alert", "Failed to save settings", "error");
                 }
             });
+
+            // Email Designer Logic
+            let activeEmailType = 'welcome';
+            const emailTabs = document.querySelectorAll('.email-sub-tab');
+            const subjectInput = document.getElementById('email-subject');
+            const bodyInput = document.getElementById('email-body');
+
+            emailTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Save current to cache before switching? Or just load from cachedSettings
+                    emailTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    activeEmailType = tab.dataset.email;
+                    
+                    const s = App.getCachedSettings();
+                    if (s) {
+                        subjectInput.value = s[`email_${activeEmailType}_subject`] || '';
+                        bodyInput.value = s[`email_${activeEmailType}_body`] || '';
+                    }
+                });
+            });
+
+            document.getElementById('btn-save-emails').addEventListener('click', async () => {
+                const s = {};
+                // We save the current active one to the cache object first
+                const currentSettings = App.getCachedSettings();
+                currentSettings[`email_${activeEmailType}_subject`] = subjectInput.value;
+                currentSettings[`email_${activeEmailType}_body`] = bodyInput.value;
+
+                // Send all templates to server (generic approach)
+                try {
+                    await App.saveSettingsData(currentSettings);
+                    App.setAlert("settings-alert", "All templates saved!", "success");
+                } catch (e) {
+                    App.setAlert("settings-alert", "Failed to save templates", "error");
+                }
+            });
+
+            window.insertImage = () => {
+                const url = prompt("Enter Image/Logo URL:");
+                if (url) {
+                    const tag = `<img src="${url}" style="max-width:100%; height:auto; margin:10px 0;">`;
+                    const start = bodyInput.selectionStart;
+                    const end = bodyInput.selectionEnd;
+                    bodyInput.value = bodyInput.value.substring(0, start) + tag + bodyInput.value.substring(end);
+                }
+            };
+
+            window.previewEmail = () => {
+                const win = window.open("", "Email Preview", "width=600,height=700");
+                const body = bodyInput.value.replace(/\n/g, '<br>');
+                const s = App.getCachedSettings();
+                const logo = s.restaurant_logo ? `<div style="text-align:center; margin-bottom:20px;"><img src="${s.restaurant_logo}" style="max-width:200px;"></div>` : "";
+                
+                win.document.write(`
+                    <html>
+                    <body style="font-family:sans-serif; padding:40px; background:#f5f5f5;">
+                        <div style="max-width:500px; margin:0 auto; background:white; padding:30px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+                            ${logo}
+                            <h2 style="font-size:18px; margin-bottom:20px;">Subject: ${subjectInput.value}</h2>
+                            <div style="font-size:15px; color:#444; line-height:1.6;">${body}</div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+            };
 
             async function loadDashboard() {
                 try {
@@ -950,43 +987,55 @@
 
                     document.getElementById("set-name").value = s.restaurant_name;
                     document.getElementById("set-email").value = s.restaurant_email || '';
-                    document.getElementById("set-address").value = s.restaurant_address || '';
+                    document.getElementById("set-logo").value = s.restaurant_logo || '';
+                    
+                    document.getElementById("set-enable-tiers").checked = s.enable_tiers;
+                    document.getElementById("set-enable-discounts").checked = s.enable_discounts;
+                    document.getElementById("set-enable-freebies").checked = s.enable_freebies;
+                    document.getElementById("set-enable-bonus").checked = s.enable_bonus;
+                    document.getElementById("set-enable-retention").checked = s.enable_retention;
+                    document.getElementById("set-enable-frequency").checked = s.enable_frequency;
+                    document.getElementById("set-enable-milestones").checked = s.enable_milestones;
+
                     document.getElementById("set-t-bronze").value = s.bronze_threshold;
                     document.getElementById("set-t-silver").value = s.silver_threshold;
                     document.getElementById("set-t-gold").value = s.gold_threshold;
-                    document.getElementById("set-t-window").value = s.tier_window_days;
+                    document.getElementById("set-t-vip").value = s.vip_threshold;
+
                     document.getElementById("set-d-new").value = s.discount_new;
                     document.getElementById("set-d-bronze").value = s.discount_bronze;
                     document.getElementById("set-d-silver").value = s.discount_silver;
                     document.getElementById("set-d-gold").value = s.discount_gold;
+                    document.getElementById("set-d-vip").value = s.discount_vip;
+
+                    document.getElementById("set-f-bronze").value = s.freebie_bronze || '';
+                    document.getElementById("set-f-silver").value = s.freebie_silver || '';
+                    document.getElementById("set-f-gold").value = s.freebie_gold || '';
+                    document.getElementById("set-f-vip").value = s.freebie_vip || '';
 
                     document.getElementById("set-r-days").value = s.retention_days;
                     document.getElementById("set-r-disc").value = s.retention_discount;
+                    document.getElementById("set-r-free").value = s.retention_freebie || '';
+
                     document.getElementById("set-f-count").value = s.frequency_visits;
                     document.getElementById("set-f-days").value = s.frequency_days;
                     document.getElementById("set-f-disc").value = s.frequency_discount;
+                    document.getElementById("set-f-free").value = s.frequency_freebie || '';
 
-                    document.getElementById("set-m-count").value = s.milestone_visits || 5;
-                    document.getElementById("set-m-reward").value = s.milestone_reward || '';
-                    document.getElementById("set-t-window").value = s.tier_window_days;
+                    document.getElementById("set-m-visits").value = s.milestone_visits || 5;
+                    document.getElementById("set-m-reward").value = s.milestone_reward || 'Free Coffee';
 
-                    document.getElementById("set-fb-bronze").value = s.freebie_bronze || '';
-                    document.getElementById("set-fb-silver").value = s.freebie_silver || '';
-                    document.getElementById("set-fb-gold").value = s.freebie_gold || '';
-
-                    // Email Designer Setup
-                    window.emailTemplates = {
-                        welcome: { subject: s.email_welcome_subject, body: s.email_welcome_body },
-                        milestone: { subject: s.email_milestone_subject, body: s.email_milestone_body },
-                        tier: { subject: s.email_tier_subject, body: s.email_tier_body }
-                    };
-                    updateEmailEditor();
+                    // Load active email template
+                    subjectInput.value = s[`email_${activeEmailType}_subject`] || '';
+                    bodyInput.value = s[`email_${activeEmailType}_body`] || '';
 
                     const stats = await App.getAdminStats();
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
                     document.getElementById("stat-today-cust").innerText = stats.visitedToday;
                     document.getElementById("stat-active").innerText = stats.active90d;
+                    document.getElementById("stat-revenue").innerText = `£${stats.revenue90d.toFixed(2)}`;
 
+                    document.getElementById("count-vip").innerText = stats.tierCounts.vip;
                     document.getElementById("count-gold").innerText = stats.tierCounts.gold;
                     document.getElementById("count-silver").innerText = stats.tierCounts.silver;
                     document.getElementById("count-bronze").innerText = stats.tierCounts.bronze;
@@ -1012,12 +1061,13 @@
                     }
 
                     tbody.innerHTML = customers.map(c => {
-                        const d = safeDate(c.created_at);
+                        const d = new Date(c.created_at);
                         let marketingHtml = `<span style="color: var(--muted); font-size: 12px;">✗ No consent</span>`;
                         if (c.marketing_consent) {
+                            const mDate = new Date(c.consent_date);
                             marketingHtml = `
                                 <div style="color: #2E7D32; font-weight: 500; font-size: 13px;">✓ Opted in</div>
-                                <div style="font-size: 11px; color: var(--muted);">${fmtDate(c.consent_date)}</div>
+                                <div style="font-size: 11px; color: var(--muted);">${new Intl.DateTimeFormat('en-GB').format(mDate)}</div>
                             `;
                         }
 
@@ -1031,7 +1081,7 @@
                             <td>${c.visit_count}</td>
                             <td>£${(parseFloat(c.spend_90d) || 0).toFixed(2)}</td>
                             <td>${marketingHtml}</td>
-                            <td>${fmtDate(c.created_at)}</td>
+                            <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
                             <td>
                                 <button class="btn-delete" onclick="window.handleDeleteCustomer('${c.email}')" title="Delete Customer">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
@@ -1057,7 +1107,7 @@
                     }
                     tbody.innerHTML = logs.map(l => `
                         <tr>
-                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${fmtDateTime(l.performed_at)}</td>
+                            <td style="white-space: nowrap; font-size: 12px; color: var(--muted);">${new Date(l.performed_at + 'Z').toLocaleString('en-GB')}</td>
                             <td style="font-weight: 500;">${escapeHTML(l.action)}</td>
                             <td>${escapeHTML(l.details)}</td>
                         </tr>
@@ -1079,7 +1129,7 @@
                             <div class="date">${v.date}</div>
                         </div>
                         <div class="list-right">
-                            <div class="spend">£${(parseFloat(v.spend) || 0).toFixed(2)}</div>
+                            <div class="spend">£${parseFloat(v.spend).toFixed(2)}</div>
                             <div class="badge badge-${v.tier}">${App.tierLabel(v.tier)}</div>
                             <div class="actions" style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;">
                                 <button class="btn-icon" onclick="window.handleEditVisit(${v.id}, ${v.spend})" title="Edit Spend" style="background:none; border:none; color:var(--muted); cursor:pointer;">

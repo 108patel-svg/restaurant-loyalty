@@ -12,18 +12,10 @@ const App = (() => {
     }
 
     async function fetchSettings() {
-        // Try header first, then query param as fallback
-        const pin = getPin();
-        let res = await fetch('/api/admin/settings', {
-            headers: { 'x-admin-pin': pin },
-            cache: 'no-store'
+        const res = await fetch('/api/admin/settings', {
+            headers: { 'x-admin-pin': getPin() }
         });
-        
-        if (!res.ok) {
-            res = await fetch(`/api/admin/settings?pin=${pin}`, { cache: 'no-store' });
-        }
-
-        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        if (!res.ok) throw new Error('Failed to fetch settings');
         cachedSettings = await res.json();
         return cachedSettings;
     }
@@ -39,39 +31,10 @@ const App = (() => {
                 'Content-Type': 'application/json',
                 'x-admin-pin': getPin() 
             },
-            body: JSON.stringify({
-                restaurantName: settings.restaurant_name,
-                restaurantEmail: settings.restaurant_email,
-                restaurantAddress: settings.restaurant_address,
-                bronze: settings.bronze_threshold,
-                silver: settings.silver_threshold,
-                gold: settings.gold_threshold,
-                dNew: settings.discount_new,
-                dBronze: settings.discount_bronze,
-                dSilver: settings.discount_silver,
-                dGold: settings.discount_gold,
-                retentionDays: settings.retentionDays,
-                retentionDiscount: settings.retentionDiscount,
-                frequencyVisits: settings.frequencyVisits,
-                frequencyDays: settings.frequencyDays,
-                frequencyDiscount: settings.frequencyDiscount,
-                milestoneVisits: settings.milestoneVisits || settings.milestone_visits,
-                milestoneReward: settings.milestoneReward || settings.milestone_reward,
-                tierWindowDays: settings.tierWindowDays || settings.tier_window_days,
-                adminPin: settings.admin_pin,
-                email_welcome_subject: settings.email_welcome_subject,
-                email_welcome_body: settings.email_welcome_body,
-                email_milestone_subject: settings.email_milestone_subject,
-                email_milestone_body: settings.email_milestone_body,
-                email_tier_subject: settings.email_tier_subject,
-                email_tier_body: settings.email_tier_body,
-                freebie_bronze: settings.freebie_bronze || '',
-                freebie_silver: settings.freebie_silver || '',
-                freebie_gold: settings.freebie_gold || ''
-            })
+            body: JSON.stringify(settings)
         });
         if (!res.ok) throw new Error('Failed to save settings');
-        if (settings.admin_pin) setPin(settings.admin_pin);
+        if (settings.adminPin) setPin(settings.adminPin);
         return await res.json();
     }
 
@@ -116,7 +79,7 @@ const App = (() => {
     }
 
     function tierLabel(tier) {
-        const labels = { 'none': 'No tier', 'bronze': 'Bronze', 'silver': 'Silver', 'gold': 'Gold' };
+        const labels = { 'none': 'No tier', 'bronze': 'Bronze', 'silver': 'Silver', 'gold': 'Gold', 'vip': 'VIP' };
         return labels[tier] || 'Unknown';
     }
 
