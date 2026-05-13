@@ -70,7 +70,33 @@ async function migrate() {
         email_frequency_body TEXT DEFAULT 'Hi {name}, here is a reward for your frequent visits: {reward}!'
       )`);
 
-      await run(`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET admin_pin = '1234'`);
+      // Helper to add missing columns (essential for existing databases)
+      const cols = [
+        ['admin_pin', 'TEXT'], ['restaurant_logo', 'TEXT'], ['restaurant_email', 'TEXT'], ['restaurant_address', 'TEXT'],
+        ['enable_tiers', 'BOOLEAN'], ['enable_milestones', 'BOOLEAN'],
+        ['enable_bonus', 'BOOLEAN'], ['enable_discounts', 'BOOLEAN'], ['enable_freebies', 'BOOLEAN'],
+        ['enable_retention', 'BOOLEAN'], ['enable_frequency', 'BOOLEAN'], 
+        ['bronze_threshold', 'REAL'], ['silver_threshold', 'REAL'], ['gold_threshold', 'REAL'], ['vip_threshold', 'REAL'],
+        ['discount_new', 'REAL'], ['discount_bronze', 'REAL'], ['discount_silver', 'REAL'], ['discount_gold', 'REAL'], ['discount_vip', 'REAL'],
+        ['freebie_bronze', 'TEXT'], ['freebie_silver', 'TEXT'], ['freebie_gold', 'TEXT'], ['freebie_vip', 'TEXT'],
+        ['retention_days', 'INTEGER'], ['retention_discount', 'REAL'], ['retention_freebie', 'TEXT'],
+        ['frequency_visits', 'INTEGER'], ['frequency_days', 'INTEGER'], ['frequency_discount', 'REAL'], ['frequency_freebie', 'TEXT'],
+        ['milestone_visits', 'INTEGER'], ['milestone_reward', 'TEXT'], 
+        ['email_welcome_subject', 'TEXT'], ['email_welcome_body', 'TEXT'],
+        ['email_milestone_subject', 'TEXT'], ['email_milestone_body', 'TEXT'], ['email_bronze_subject', 'TEXT'],
+        ['email_bronze_body', 'TEXT'], ['email_silver_subject', 'TEXT'], ['email_silver_body', 'TEXT'],
+        ['email_gold_subject', 'TEXT'], ['email_gold_body', 'TEXT'], ['email_vip_subject', 'TEXT'],
+        ['email_vip_body', 'TEXT'], ['email_retention_subject', 'TEXT'], ['email_retention_body', 'TEXT'],
+        ['email_frequency_subject', 'TEXT'], ['email_frequency_body', 'TEXT']
+      ];
+
+      for (const [col, type] of cols) {
+        try {
+          await run(`ALTER TABLE settings ADD COLUMN ${col} ${type}`);
+        } catch (e) { 
+          // Silently ignore "already exists" errors
+        }
+      }
 
       // Customers Table
       await run(`CREATE TABLE IF NOT EXISTS customers (
@@ -101,26 +127,8 @@ async function migrate() {
         performed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )`);
 
-      // Helper to add missing columns
-      const cols = [
-        ['restaurant_logo', 'TEXT'], ['enable_tiers', 'BOOLEAN'], ['enable_milestones', 'BOOLEAN'],
-        ['enable_bonus', 'BOOLEAN'], ['enable_discounts', 'BOOLEAN'], ['enable_freebies', 'BOOLEAN'],
-        ['enable_retention', 'BOOLEAN'], ['enable_frequency', 'BOOLEAN'], ['freebie_bronze', 'TEXT'],
-        ['freebie_silver', 'TEXT'], ['freebie_gold', 'TEXT'], ['freebie_vip', 'TEXT'],
-        ['retention_freebie', 'TEXT'], ['frequency_freebie', 'TEXT'], ['milestone_visits', 'INTEGER'],
-        ['milestone_reward', 'TEXT'], ['email_welcome_subject', 'TEXT'], ['email_welcome_body', 'TEXT'],
-        ['email_milestone_subject', 'TEXT'], ['email_milestone_body', 'TEXT'], ['email_bronze_subject', 'TEXT'],
-        ['email_bronze_body', 'TEXT'], ['email_silver_subject', 'TEXT'], ['email_silver_body', 'TEXT'],
-        ['email_gold_subject', 'TEXT'], ['email_gold_body', 'TEXT'], ['email_vip_subject', 'TEXT'],
-        ['email_vip_body', 'TEXT'], ['email_retention_subject', 'TEXT'], ['email_retention_body', 'TEXT'],
-        ['email_frequency_subject', 'TEXT'], ['email_frequency_body', 'TEXT']
-      ];
-
-      for (const [col, type] of cols) {
-        try {
-          await run(`ALTER TABLE settings ADD COLUMN ${col} ${type}`);
-        } catch (e) { /* ignore duplicate column */ }
-      }
+      // Now it is safe to insert/update row 1
+      await run(`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET admin_pin = '1234'`);
 
       console.log('PostgreSQL migration complete.');
       await pool.end();
