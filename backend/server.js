@@ -7,6 +7,8 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const sgMail = require('@sendgrid/mail');
+if (process.env.SENDGRID_API_KEY) sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,10 +79,10 @@ app.use(cors());
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: *.jpg *.png *.webp; frame-src https://www.google.com"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.google.com"
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   next();
 });
 
@@ -133,8 +135,6 @@ async function sendEmail(to, subject, body, settings) {
     console.log(`[EMAIL-DEBUG] To: ${to}\nSubject: ${subject}\nBody: ${body}\n`);
     return;
   }
-  const sgMail = require('@sendgrid/mail');
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
   
   // Basic logo embedding if present
   let html = body.replace(/\n/g, '<br>');
@@ -221,7 +221,8 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
     if (settings.enable_retention) {
       const lastVisit = await get(`SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1`, [customer.id]);
       if (lastVisit) {
-        const diffDays = (new Date() - new Date(lastVisit.visited_at + 'Z')) / (1000 * 60 * 60 * 24);
+        const lastVisitTs = lastVisit.visited_at instanceof Date ? lastVisit.visited_at : new Date(lastVisit.visited_at + 'Z');
+        const diffDays = (new Date() - lastVisitTs) / (1000 * 60 * 60 * 24);
         if (diffDays <= (settings.retention_days || 14)) {
           if (settings.enable_discounts) result.discount = Math.max(result.discount, settings.retention_discount || 0);
           if (settings.enable_freebies && settings.retention_freebie) result.freebie = result.freebie ? result.freebie + ' + ' + settings.retention_freebie : settings.retention_freebie;
