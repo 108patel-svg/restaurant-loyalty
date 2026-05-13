@@ -826,7 +826,8 @@
                         document.getElementById("view-dashboard").style.display = "block";
                         resetInactivityTimer();
                     } catch (err) {
-                        App.setAlert("login-alert", "Incorrect PIN or server error", "error");
+                        console.error("Login failed:", err);
+                        App.setAlert("login-alert", err.message || "Incorrect PIN or server error", "error");
                         pinInput.value = "";
                     }
                 } catch (err) {

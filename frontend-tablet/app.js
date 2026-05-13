@@ -15,7 +15,10 @@ const App = (() => {
         const res = await fetch('/api/admin/settings', {
             headers: { 'x-admin-pin': getPin() }
         });
-        if (!res.ok) throw new Error('Failed to fetch settings');
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || data.message || 'Failed to fetch settings');
+        }
         cachedSettings = await res.json();
         return cachedSettings;
     }
