@@ -150,6 +150,7 @@
                 <p class="discount-text" id="res-discount" style="display:none;">10% OFF TODAY</p>
                 <p class="discount-text" id="res-freebie" style="display:none; color: #B8924A;">FREE ITEM EARNED</p>
                 <p class="discount-text" id="res-milestone" style="display:none; color: #B8924A; font-size: 20px;">+ MILESTONE: FREE ITEM!</p>
+                <p id="res-points" style="display:none; font-weight: 600; color: var(--muted); margin-top: 10px;">Points Balance: 0</p>
             </div>
 
             <p class="subtitle">Your rewards have been updated successfully.</p>
@@ -246,6 +247,12 @@
                                 mileEl.innerText = `+ MILESTONE: ${data.milestoneReward}`;
                                 mileEl.style.display = 'block';
                             } else { mileEl.style.display = 'none'; }
+
+                            if (data.tierInfo && data.tierInfo.points_balance !== undefined) {
+                                const ptsEl = document.getElementById('res-points');
+                                ptsEl.innerText = `Points Balance: ${Math.floor(data.tierInfo.points_balance)}`;
+                                ptsEl.style.display = 'block';
+                            }
 
                             showStep('step-success');
                             startAutoReset();

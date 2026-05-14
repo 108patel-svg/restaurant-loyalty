@@ -12,6 +12,10 @@ if (process.env.SENDGRID_API_KEY) sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const migrate = require('./migrate');
+
+// Run migration on boot
+migrate().catch(err => console.error('[BOOT-MIGRATE] Critical failure:', err));
 
 // DB Setup
 const isProd = !!process.env.DATABASE_URL;
@@ -252,6 +256,15 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
         if (settings.enable_freebies && settings.frequency_freebie) result.freebie = result.freebie ? result.freebie + ' + ' + settings.frequency_freebie : settings.frequency_freebie;
       }
     }
+  // 3. Points System
+  if (settings.enable_points && settings.points_threshold > 0) {
+    if (customer.points_balance >= settings.points_threshold) {
+      if (settings.enable_discounts) result.discount = Math.max(result.discount, settings.points_discount || 0);
+      if (settings.enable_freebies && settings.points_freebie) {
+        result.freebie = result.freebie ? result.freebie + ' + ' + settings.points_freebie : settings.points_freebie;
+      }
+      result.type = 'points_reward';
+    }
   }
 
   return result;
@@ -269,15 +282,19 @@ async function recalculateTier(customerId, settings) {
   if (!row) return { newTier: 'none', spend90d: 0, visitCount: 0 };
 
   const spend = row.total_90d || 0;
+  const visits = row.visit_count || 0;
+  const metricValue = settings.tier_metric === 'visits' ? visits : spend;
   let tier = 'none';
 
-  if (spend >= (settings.vip_threshold || 2000)) tier = 'vip';
-  else if (spend >= (settings.gold_threshold || 1000)) tier = 'gold';
-  else if (spend >= (settings.silver_threshold || 600)) tier = 'silver';
-  else if (spend >= (settings.bronze_threshold || 300)) tier = 'bronze';
+  if (metricValue >= (settings.vip_threshold || 2000)) tier = 'vip';
+  else if (metricValue >= (settings.gold_threshold || 1000)) tier = 'gold';
+  else if (metricValue >= (settings.silver_threshold || 600)) tier = 'silver';
+  else if (metricValue >= (settings.bronze_threshold || 300)) tier = 'bronze';
 
   await run('UPDATE customers SET current_tier = ? WHERE id = ?', [tier, customerId]);
-  return { newTier: tier, spend90d: spend, visitCount: row.visit_count };
+  
+  const updatedCust = await get('SELECT points_balance FROM customers WHERE id = ?', [customerId]);
+  return { newTier: tier, spend90d: spend, visitCount: visits, points_balance: updatedCust.points_balance };
 }
 
 // ENDPOINTS
@@ -319,6 +336,17 @@ app.post('/api/checkin-with-spend', visitLimiter, safe(async (req, res) => {
   // 2. Add Visit
   await run('INSERT INTO visits (customer_id, spend) VALUES (?, ?)', [customer.id, spend]);
   
+  // 2.5 Update Points Balance (1 £ = 1 Point)
+  if (s.enable_points) {
+    const newBalance = (customer.points_balance || 0) + spend;
+    if (rewards.type === 'points_reward') {
+      // If they just used a points reward, deduct the threshold
+      await run('UPDATE customers SET points_balance = ? WHERE id = ?', [newBalance - s.points_threshold, customer.id]);
+    } else {
+      await run('UPDATE customers SET points_balance = ? WHERE id = ?', [newBalance, customer.id]);
+    }
+  }
+
   // 3. Recalculate Tier (AFTER adding this visit)
   const tierInfo = await recalculateTier(customer.id, s);
 
@@ -336,7 +364,13 @@ app.post('/api/checkin-with-spend', visitLimiter, safe(async (req, res) => {
   res.json({ success: true, rewards, tierInfo });
 }));
 
-app.get('/api/customer-status', statusLimiter, safe(async (req, res) => {
+app.get('/api/config', (req, res) => {
+  res.json({
+    recaptchaSiteKey: process.env.RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
+  });
+});
+
+const getStatus = safe(async (req, res) => {
   const email = req.query.email?.toLowerCase().trim();
   if (!email) return res.status(400).json({ found: false });
 
@@ -350,22 +384,57 @@ app.get('/api/customer-status', statusLimiter, safe(async (req, res) => {
   const visits = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
   const lastVisit = await get('SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1', [customer.id]);
   
+  // Calculate next tier info based on chosen metric
+  let nextTier = 'bronze';
+  let nextThreshold = s.bronze_threshold || 300;
+  if (tierInfo.newTier === 'bronze') { nextTier = 'silver'; nextThreshold = s.silver_threshold || 600; }
+  else if (tierInfo.newTier === 'silver') { nextTier = 'gold'; nextThreshold = s.gold_threshold || 1000; }
+  else if (tierInfo.newTier === 'gold') { nextTier = 'vip'; nextThreshold = s.vip_threshold || 2000; }
+  else if (tierInfo.newTier === 'vip') { nextTier = 'max'; nextThreshold = s.vip_threshold || 2000; }
+
+  const currentMetric = s.tier_metric === 'visits' ? tierInfo.visitCount : tierInfo.spend90d;
+  const prevThreshold = tierInfo.newTier === 'none' ? 0 : 
+                       (tierInfo.newTier === 'bronze' ? s.bronze_threshold : 
+                       (tierInfo.newTier === 'silver' ? s.silver_threshold : s.gold_threshold));
+  
+  const progressPercent = nextTier === 'max' ? 100 : Math.min(100, Math.max(0, ((currentMetric - prevThreshold) / (nextThreshold - prevThreshold)) * 100));
+
   res.json({
     found: true,
     name: customer.name,
     email: customer.email,
+    tier: tierInfo.newTier,
     currentTier: tierInfo.newTier,
-    spend90d: tierInfo.spend90d,
-    visitCount: visits.count,
+    spend90d: Number(tierInfo.spend90d),
+    visitCount90d: tierInfo.visitCount,
+    metric: s.tier_metric, // spend or visits
+    totalVisits: visits.count,
+    points_balance: customer.points_balance || 0,
+    points_threshold: s.points_threshold,
+    enable_points: s.enable_points,
+    consentDate: customer.consent_date ? new Date(customer.consent_date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'Unknown',
     joinedDate: customer.created_at,
+    lastVisit: lastVisit ? new Date(lastVisit.visited_at + 'Z').toLocaleDateString('en-GB') : 'Never',
     lastVisited: lastVisit ? lastVisit.visited_at : null,
     rewards,
+    discount: rewards.discount,
+    freebie: rewards.freebie,
+    nextTier,
+    nextThreshold,
+    currentMetric,
+    progressPercent: Math.round(progressPercent),
+    enable_discounts: s.enable_discounts,
+    enable_freebies: s.enable_freebies,
     settings: {
       bronze: s.bronze_threshold, silver: s.silver_threshold, gold: s.gold_threshold, vip: s.vip_threshold,
-      enableTiers: s.enable_tiers, enableDiscounts: s.enable_discounts, enableFreebies: s.enable_freebies
+      enableTiers: s.enable_tiers, enableDiscounts: s.enable_discounts, enableFreebies: s.enable_freebies,
+      tier_metric: s.tier_metric, enable_points: s.enable_points, points_threshold: s.points_threshold
     }
   });
-}));
+});
+
+app.get('/api/customer-status', statusLimiter, getStatus);
+app.get('/api/status', statusLimiter, getStatus);
 
 // ADMIN AUTH
 const adminAuth = async (req, res, next) => {
@@ -502,7 +571,10 @@ app.put('/api/admin/settings', adminAuth, safe(async (req, res) => {
     retentionFreebie: 'retention_freebie',
     frequencyVisits: 'frequency_visits', frequencyDays: 'frequency_days', 
     frequencyDiscount: 'frequency_discount', frequencyFreebie: 'frequency_freebie',
-    milestoneVisits: 'milestone_visits', milestoneReward: 'milestone_reward'
+    milestoneVisits: 'milestone_visits', milestoneReward: 'milestone_reward',
+    tierMetric: 'tier_metric',
+    enablePoints: 'enable_points', pointsThreshold: 'points_threshold',
+    pointsDiscount: 'points_discount', pointsFreebie: 'points_freebie'
   };
 
   // Add email templates to map

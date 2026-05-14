@@ -306,7 +306,7 @@
             overflow-x: auto;
         }
 
-        table {
+        <table>
             width: 100%;
             border-collapse: collapse;
             text-align: left;
@@ -627,6 +627,7 @@
                                 <th>Tier</th>
                                 <th>Visits</th>
                                 <th>90-Day Spend</th>
+                                <th>Points</th>
                                 <th>Marketing</th>
                                 <th>Member Since</th>
                                 <th style="width: 100px;">Actions</th>
@@ -700,10 +701,18 @@
                             <label class="switch"><input type="checkbox" id="set-enable-freebies"><span class="slider"></span></label>
                         </div>
 
-                        <div class="form-row"><label>Bronze Threshold (£)</label><input type="number" id="set-t-bronze"></div>
-                        <div class="form-row"><label>Silver Threshold (£)</label><input type="number" id="set-t-silver"></div>
-                        <div class="form-row"><label>Gold Threshold (£)</label><input type="number" id="set-t-gold"></div>
-                        <div class="form-row"><label>VIP Threshold (£)</label><input type="number" id="set-t-vip"></div>
+                        <div class="form-row">
+                            <label>Tier Metric</label>
+                            <select id="set-tier-metric" style="width: 200px; padding: 8px; border-radius: 8px; border: 1px solid var(--border);">
+                                <option value="spend">Total Spend (£)</option>
+                                <option value="visits">Number of Visits</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row"><label>Bronze Threshold</label><input type="number" id="set-t-bronze"></div>
+                        <div class="form-row"><label>Silver Threshold</label><input type="number" id="set-t-silver"></div>
+                        <div class="form-row"><label>Gold Threshold</label><input type="number" id="set-t-gold"></div>
+                        <div class="form-row"><label>VIP Threshold</label><input type="number" id="set-t-vip"></div>
                     </div>
 
                     <div class="settings-card">
@@ -750,6 +759,16 @@
                         </div>
                         <div class="form-row"><label>Every X visits</label><input type="number" id="set-m-visits"></div>
                         <div class="form-row"><label>Reward Item</label><input type="text" id="set-m-reward" style="width:120px;"></div>
+
+                        <div class="section-header">
+                            <h3>Points System (1 £ = 1 Pt)</h3>
+                            <label class="switch"><input type="checkbox" id="set-enable-points"><span class="slider"></span></label>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px;">
+                            <div class="form-row"><label>Points Threshold</label><input type="number" id="set-p-threshold"></div>
+                            <div class="form-row"><label>Disc (%)</label><input type="number" id="set-p-disc"></div>
+                            <div class="form-row"><label>Freebie Item</label><input type="text" id="set-p-free" style="width:120px;"></div>
+                        </div>
 
                         <button class="primary" id="btn-save-settings" style="width: 100%;">Save All Settings</button>
                     </div>
@@ -905,6 +924,12 @@
                 s.milestoneVisits = Number(document.getElementById("set-m-visits").value);
                 s.milestoneReward = document.getElementById("set-m-reward").value.trim();
 
+                s.tierMetric = document.getElementById("set-tier-metric").value;
+                s.enablePoints = document.getElementById("set-enable-points").checked ? 1 : 0;
+                s.pointsThreshold = Number(document.getElementById("set-p-threshold").value);
+                s.pointsDiscount = Number(document.getElementById("set-p-disc").value);
+                s.pointsFreebie = document.getElementById("set-p-free").value.trim();
+
                 try {
                     await App.saveSettingsData(s);
                     App.setAlert("settings-alert", "Settings saved successfully", "success");
@@ -1026,6 +1051,12 @@
                     document.getElementById("set-m-visits").value = s.milestone_visits || 5;
                     document.getElementById("set-m-reward").value = s.milestone_reward || 'Free Coffee';
 
+                    document.getElementById("set-tier-metric").value = s.tier_metric || 'spend';
+                    document.getElementById("set-enable-points").checked = s.enable_points;
+                    document.getElementById("set-p-threshold").value = s.points_threshold || 100;
+                    document.getElementById("set-p-disc").value = s.points_discount || 10;
+                    document.getElementById("set-p-free").value = s.points_freebie || '';
+
                     // Load active email template
                     subjectInput.value = s[`email_${activeEmailType}_subject`] || '';
                     bodyInput.value = s[`email_${activeEmailType}_body`] || '';
@@ -1081,6 +1112,7 @@
                             <td><span class="badge badge-${c.current_tier}">${App.tierLabel(c.current_tier)}</span></td>
                             <td>${c.visit_count}</td>
                             <td>£${(parseFloat(c.spend_90d) || 0).toFixed(2)}</td>
+                            <td>${Math.floor(c.points_balance || 0)}</td>
                             <td>${marketingHtml}</td>
                             <td>${new Intl.DateTimeFormat('en-GB').format(d)}</td>
                             <td>

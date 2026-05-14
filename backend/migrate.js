@@ -34,6 +34,11 @@ async function migrate() {
         silver_threshold REAL DEFAULT 600,
         gold_threshold REAL DEFAULT 1000,
         vip_threshold REAL DEFAULT 2000,
+        tier_metric TEXT DEFAULT 'spend',
+        enable_points BOOLEAN DEFAULT false,
+        points_threshold INTEGER DEFAULT 100,
+        points_discount REAL DEFAULT 10,
+        points_freebie TEXT,
         discount_new REAL DEFAULT 10,
         discount_bronze REAL DEFAULT 10,
         discount_silver REAL DEFAULT 15,
@@ -76,6 +81,8 @@ async function migrate() {
         ['enable_tiers', 'BOOLEAN'], ['enable_milestones', 'BOOLEAN'],
         ['enable_bonus', 'BOOLEAN'], ['enable_discounts', 'BOOLEAN'], ['enable_freebies', 'BOOLEAN'],
         ['enable_retention', 'BOOLEAN'], ['enable_frequency', 'BOOLEAN'], 
+        ['tier_metric', 'TEXT'], ['enable_points', 'BOOLEAN'], ['points_threshold', 'INTEGER'],
+        ['points_discount', 'REAL'], ['points_freebie', 'TEXT'],
         ['bronze_threshold', 'REAL'], ['silver_threshold', 'REAL'], ['gold_threshold', 'REAL'], ['vip_threshold', 'REAL'],
         ['discount_new', 'REAL'], ['discount_bronze', 'REAL'], ['discount_silver', 'REAL'], ['discount_gold', 'REAL'], ['discount_vip', 'REAL'],
         ['freebie_bronze', 'TEXT'], ['freebie_silver', 'TEXT'], ['freebie_gold', 'TEXT'], ['freebie_vip', 'TEXT'],
@@ -105,6 +112,7 @@ async function migrate() {
         email TEXT UNIQUE NOT NULL,
         phone TEXT,
         current_tier TEXT DEFAULT 'none',
+        points_balance REAL DEFAULT 0,
         marketing_consent BOOLEAN DEFAULT false,
         consent_date TIMESTAMPTZ,
         consent_ip TEXT,
@@ -152,6 +160,9 @@ async function migrate() {
         enable_retention BOOLEAN DEFAULT 1, enable_frequency BOOLEAN DEFAULT 1,
         bronze_threshold REAL DEFAULT 300, silver_threshold REAL DEFAULT 600,
         gold_threshold REAL DEFAULT 1000, vip_threshold REAL DEFAULT 2000,
+        tier_metric TEXT DEFAULT 'spend',
+        enable_points BOOLEAN DEFAULT 0, points_threshold INTEGER DEFAULT 100,
+        points_discount REAL DEFAULT 10, points_freebie TEXT,
         discount_new REAL DEFAULT 10, discount_bronze REAL DEFAULT 10,
         discount_silver REAL DEFAULT 15, discount_gold REAL DEFAULT 20, discount_vip REAL DEFAULT 25,
         freebie_bronze TEXT, freebie_silver TEXT, freebie_gold TEXT, freebie_vip TEXT,
@@ -175,14 +186,14 @@ async function migrate() {
       const addCol = (col, type) => {
         db.run(`ALTER TABLE settings ADD COLUMN ${col} ${type}`, (err) => {});
       };
-      // ... existing addCol logic is summarized above in the create table, but for legacy support:
-      const cols = ['restaurant_logo', 'enable_tiers', 'enable_milestones', 'enable_bonus', 'enable_discounts', 'enable_freebies', 'enable_retention', 'enable_frequency', 'freebie_bronze', 'freebie_silver', 'freebie_gold', 'freebie_vip', 'retention_freebie', 'frequency_freebie', 'milestone_visits', 'milestone_reward', 'email_welcome_subject', 'email_welcome_body', 'email_milestone_subject', 'email_milestone_body', 'email_bronze_subject', 'email_bronze_body', 'email_silver_subject', 'email_silver_body', 'email_gold_subject', 'email_gold_body', 'email_vip_subject', 'email_vip_body', 'email_retention_subject', 'email_retention_body', 'email_frequency_subject', 'email_frequency_body'];
+      // Ensure all possible columns exist
+      const cols = ['restaurant_logo', 'enable_tiers', 'enable_milestones', 'enable_bonus', 'enable_discounts', 'enable_freebies', 'enable_retention', 'enable_frequency', 'tier_metric', 'enable_points', 'points_threshold', 'points_discount', 'points_freebie', 'freebie_bronze', 'freebie_silver', 'freebie_gold', 'freebie_vip', 'retention_freebie', 'frequency_freebie', 'milestone_visits', 'milestone_reward', 'email_welcome_subject', 'email_welcome_body', 'email_milestone_subject', 'email_milestone_body', 'email_bronze_subject', 'email_bronze_body', 'email_silver_subject', 'email_silver_body', 'email_gold_subject', 'email_gold_body', 'email_vip_subject', 'email_vip_body', 'email_retention_subject', 'email_retention_body', 'email_frequency_subject', 'email_frequency_body'];
       cols.forEach(c => addCol(c, 'TEXT'));
 
       db.run(`CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, phone TEXT,
-        current_tier TEXT DEFAULT 'none', marketing_consent BOOLEAN DEFAULT 0,
+        current_tier TEXT DEFAULT 'none', points_balance REAL DEFAULT 0, marketing_consent BOOLEAN DEFAULT 0,
         consent_date DATETIME, consent_ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
       db.run(`CREATE TABLE IF NOT EXISTS visits (
@@ -200,4 +211,12 @@ async function migrate() {
   }
 }
 
-migrate();
+module.exports = migrate;
+
+if (require.main === module) {
+  migrate().then(() => {
+    console.log('Migration complete');
+  }).catch(err => {
+    console.error('Migration failed:', err);
+  });
+}

@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <script src="https://www.google.com/recaptcha/api.js?render=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></script>
     <style>
         :root {
             --brand: #C4531A;
@@ -118,7 +117,7 @@
 </head>
 <body>
     <header>
-        <h1>Rewards Portal</h1>
+        <h1 class="restaurant-name-disp">Rewards Portal</h1>
         <p class="subtitle">Check your loyalty status anytime</p>
     </header>
 
@@ -163,6 +162,18 @@
                 <span id="disp-discount" style="display:none;">10% OFF</span>
                 <span id="disp-freebie" style="display:none; color: var(--brand-dark);">+ FREE ITEM</span>
             </div>
+
+            <!-- Points System Display -->
+            <div id="points-area" style="display:none; margin-top: 24px; padding: 20px; background: #F9F7F5; border-radius: 16px; border: 1px solid var(--border);">
+                <div class="progress-meta">
+                    <span>Points Balance</span>
+                    <span id="disp-points-val">0</span>
+                </div>
+                <div class="bar-bg" style="margin: 10px 0;">
+                    <div id="points-fill" class="bar-fill" style="background: var(--brand-dark);"></div>
+                </div>
+                <p id="disp-points-togo" style="font-size: 11px; color: var(--muted); font-weight: 600;">0 points to next reward</p>
+            </div>
             
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); line-height: 1.8;">
                 <p>Member Since: <span id="disp-since">--</span></p>
@@ -180,12 +191,26 @@
 
     <footer>
         <a href="terms.html">Terms</a>
-        <a href="terms.html">Privacy</a>
-        <a href="mailto:loyalty@yourrestaurant.com">Support</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="mailto:support@yourrestaurant.com">Support</a>
     </footer>
 
     <script>
-        const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+        let RECAPTCHA_SITE_KEY = '';
+
+        async function initApp() {
+            try {
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                RECAPTCHA_SITE_KEY = config.recaptchaSiteKey;
+                if (RECAPTCHA_SITE_KEY) {
+                    const script = document.createElement('script');
+                    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
+                    document.head.appendChild(script);
+                }
+            } catch (err) {}
+        }
+        initApp();
 
         function resetSearch() {
             document.getElementById('email').value = '';
@@ -204,60 +229,89 @@
             btn.disabled = true;
             btn.innerText = "Verifying...";
 
-            grecaptcha.ready(() => {
-                grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'status'}).then(async (token) => {
-                    try {
-                        const res = await fetch(`/api/status?email=${encodeURIComponent(email)}&recaptcha_token=${token}`);
-                        const data = await res.json();
+            const runLookup = async (token = '') => {
+                try {
+                    const res = await fetch(`/api/status?email=${encodeURIComponent(email)}&recaptcha_token=${token}`);
+                    if (!res.ok) throw new Error("Server error");
+                    const data = await res.json();
+                    
+                    if (data.found) {
+                        document.getElementById('lookup-view').style.display = 'none';
+                        document.getElementById('status-view').style.display = 'block';
                         
-                        if (data.found) {
-                            document.getElementById('lookup-view').style.display = 'none';
-                            document.getElementById('status-view').style.display = 'block';
-                            
-                            document.getElementById('disp-name').innerText = data.name;
-                            document.getElementById('disp-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
-                            document.getElementById('disp-badge').className = `tier-badge tier-${data.tier}`;
-                            document.getElementById('disp-spend').innerText = `£${data.spend90d.toFixed(2)}`;
-                            document.getElementById('disp-visits').innerText = data.totalVisits;
-                            
-                            const discEl = document.getElementById('disp-discount');
-                            const freeEl = document.getElementById('disp-freebie');
-                            
-                            if (data.enable_discounts && data.discount > 0) {
-                                discEl.innerText = `${data.discount}% OFF`;
-                                discEl.style.display = 'inline';
-                            } else { discEl.style.display = 'none'; }
+                        document.getElementById('disp-name').innerText = data.name;
+                        document.getElementById('disp-badge').innerText = `${data.tier.toUpperCase()} STATUS`;
+                        document.getElementById('disp-badge').className = `tier-badge tier-${data.tier}`;
+                        document.getElementById('disp-spend').innerText = `£${data.spend90d.toFixed(2)}`;
+                        document.getElementById('disp-visits').innerText = data.totalVisits;
+                        
+                        const discEl = document.getElementById('disp-discount');
+                        const freeEl = document.getElementById('disp-freebie');
+                        
+                        if (data.enable_discounts && data.discount > 0) {
+                            discEl.innerText = `${data.discount}% OFF`;
+                            discEl.style.display = 'inline';
+                        } else { discEl.style.display = 'none'; }
 
-                            if (data.enable_freebies && data.freebie) {
-                                freeEl.innerText = (data.discount > 0 ? " & " : "") + data.freebie;
-                                freeEl.style.display = 'inline';
-                            } else { freeEl.style.display = 'none'; }
+                        if (data.enable_freebies && data.freebie) {
+                            freeEl.innerText = (data.discount > 0 ? " & " : "") + data.freebie;
+                            freeEl.style.display = 'inline';
+                        } else { freeEl.style.display = 'none'; }
 
-                            document.getElementById('reward-box').style.display = (discEl.style.display === 'none' && freeEl.style.display === 'none') ? 'none' : 'block';
-                            document.getElementById('disp-since').innerText = data.consentDate;
-                            document.getElementById('disp-last').innerText = data.lastVisit;
+                        document.getElementById('reward-box').style.display = (discEl.style.display === 'none' && freeEl.style.display === 'none') ? 'none' : 'block';
+                        document.getElementById('disp-since').innerText = data.consentDate;
+                        document.getElementById('disp-last').innerText = data.lastVisit;
 
-                            if (data.tier === 'vip') {
-                                document.getElementById('progress-area').style.display = 'none';
-                            } else {
-                                document.getElementById('progress-area').style.display = 'block';
-                                document.getElementById('disp-next').innerText = `Next: ${data.nextTier.toUpperCase()}`;
-                                document.getElementById('disp-togo').innerText = `£${(data.nextThreshold - data.spend90d).toFixed(2)} to go`;
-                                setTimeout(() => {
-                                    document.getElementById('bar-fill').style.width = `${data.progressPercent}%`;
-                                }, 200);
-                            }
+                        if (data.tier === 'vip' || data.nextTier === 'max') {
+                            document.getElementById('progress-area').style.display = 'none';
                         } else {
-                            document.getElementById('lookup-view').style.display = 'none';
-                            document.getElementById('error-view').style.display = 'block';
+                            document.getElementById('progress-area').style.display = 'block';
+                            const metricLabel = data.metric === 'visits' ? 'visits' : '£';
+                            document.getElementById('disp-next').innerText = `Next: ${data.nextTier.toUpperCase()}`;
+                            document.getElementById('disp-togo').innerText = data.metric === 'visits' 
+                                ? `${Math.ceil(data.nextThreshold - data.currentMetric)} visits to go`
+                                : `£${Math.max(0, data.nextThreshold - data.currentMetric).toFixed(2)} to go`;
+                            
+                            setTimeout(() => {
+                                document.getElementById('bar-fill').style.width = `${data.progressPercent}%`;
+                            }, 200);
                         }
-                    } catch (err) {
-                        alert("Lookup failed. Please check your connection.");
-                        btn.disabled = false;
-                        btn.innerText = "View My Rewards →";
+
+                        // Points Balance Progress
+                        if (data.enable_points && data.points_threshold > 0) {
+                            document.getElementById('points-area').style.display = 'block';
+                            const pts = Math.floor(data.points_balance || 0);
+                            const threshold = data.points_threshold;
+                            document.getElementById('disp-points-val').innerText = pts;
+                            const ptsToGo = Math.max(0, threshold - pts);
+                            document.getElementById('disp-points-togo').innerText = `${ptsToGo} points until your next bonus reward!`;
+                            const ptsPercent = Math.min(100, (pts / threshold) * 100);
+                            setTimeout(() => {
+                                document.getElementById('points-fill').style.width = `${ptsPercent}%`;
+                            }, 400);
+                        } else {
+                            document.getElementById('points-area').style.display = 'none';
+                        }
+                    } else {
+                        document.getElementById('lookup-view').style.display = 'none';
+                        document.getElementById('error-view').style.display = 'block';
                     }
+                } catch (err) {
+                    alert("Lookup failed. Please check your connection.");
+                    btn.disabled = false;
+                    btn.innerText = "View My Rewards →";
+                }
+            };
+
+            if (typeof grecaptcha === 'undefined' || !RECAPTCHA_SITE_KEY) {
+                runLookup();
+            } else {
+                grecaptcha.ready(() => {
+                    grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'status'}).then(async (token) => {
+                        await runLookup(token);
+                    }).catch(() => runLookup());
                 });
-            });
+            }
         });
     </script>
 </body>
