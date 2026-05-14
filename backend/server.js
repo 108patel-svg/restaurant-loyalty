@@ -90,13 +90,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files from both sites
-// The backend folder is inside the project root, so we go up one level to reach the frontend folders
+// Serve static files
 app.use('/tablet', express.static(path.join(__dirname, '../frontend-tablet')));
-app.use('/public', express.static(path.join(__dirname, '../frontend-public')));
-
-// Root redirect
-app.get('/', (req, res) => res.redirect('/public'));
+app.use('/', express.static(path.join(__dirname, '../frontend-public')));
 
 // Rate Limiting
 const visitLimiter = rateLimit({
@@ -256,6 +252,8 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
         if (settings.enable_freebies && settings.frequency_freebie) result.freebie = result.freebie ? result.freebie + ' + ' + settings.frequency_freebie : settings.frequency_freebie;
       }
     }
+  }
+
   // 3. Points System
   if (settings.enable_points && settings.points_threshold > 0) {
     if (customer.points_balance >= settings.points_threshold) {
