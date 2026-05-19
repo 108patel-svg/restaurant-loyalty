@@ -30,6 +30,15 @@ async function migrate() {
         enable_freebies BOOLEAN DEFAULT true,
         enable_retention BOOLEAN DEFAULT true,
         enable_frequency BOOLEAN DEFAULT true,
+        enable_retention_discounts BOOLEAN DEFAULT true,
+        enable_retention_freebies BOOLEAN DEFAULT true,
+        enable_frequency_discounts BOOLEAN DEFAULT true,
+        enable_frequency_freebies BOOLEAN DEFAULT true,
+        enable_milestone_discounts BOOLEAN DEFAULT false,
+        enable_milestone_freebies BOOLEAN DEFAULT true,
+        milestone_discount REAL DEFAULT 10,
+        enable_points_discounts BOOLEAN DEFAULT true,
+        enable_points_freebies BOOLEAN DEFAULT true,
         bronze_threshold REAL DEFAULT 300,
         silver_threshold REAL DEFAULT 600,
         gold_threshold REAL DEFAULT 1000,
@@ -81,6 +90,11 @@ async function migrate() {
         ['enable_tiers', 'BOOLEAN'], ['enable_milestones', 'BOOLEAN'],
         ['enable_bonus', 'BOOLEAN'], ['enable_discounts', 'BOOLEAN'], ['enable_freebies', 'BOOLEAN'],
         ['enable_retention', 'BOOLEAN'], ['enable_frequency', 'BOOLEAN'], 
+        ['enable_retention_discounts', 'BOOLEAN'], ['enable_retention_freebies', 'BOOLEAN'],
+        ['enable_frequency_discounts', 'BOOLEAN'], ['enable_frequency_freebies', 'BOOLEAN'],
+        ['enable_milestone_discounts', 'BOOLEAN'], ['enable_milestone_freebies', 'BOOLEAN'],
+        ['milestone_discount', 'REAL'],
+        ['enable_points_discounts', 'BOOLEAN'], ['enable_points_freebies', 'BOOLEAN'],
         ['tier_metric', 'TEXT'], ['enable_points', 'BOOLEAN'], ['points_threshold', 'INTEGER'],
         ['points_discount', 'REAL'], ['points_freebie', 'TEXT'],
         ['bronze_threshold', 'REAL'], ['silver_threshold', 'REAL'], ['gold_threshold', 'REAL'], ['vip_threshold', 'REAL'],
@@ -158,6 +172,11 @@ async function migrate() {
         enable_tiers BOOLEAN DEFAULT 1, enable_milestones BOOLEAN DEFAULT 1, enable_bonus BOOLEAN DEFAULT 1,
         enable_discounts BOOLEAN DEFAULT 1, enable_freebies BOOLEAN DEFAULT 1,
         enable_retention BOOLEAN DEFAULT 1, enable_frequency BOOLEAN DEFAULT 1,
+        enable_retention_discounts BOOLEAN DEFAULT 1, enable_retention_freebies BOOLEAN DEFAULT 1,
+        enable_frequency_discounts BOOLEAN DEFAULT 1, enable_frequency_freebies BOOLEAN DEFAULT 1,
+        enable_milestone_discounts BOOLEAN DEFAULT 0, enable_milestone_freebies BOOLEAN DEFAULT 1,
+        milestone_discount REAL DEFAULT 10,
+        enable_points_discounts BOOLEAN DEFAULT 1, enable_points_freebies BOOLEAN DEFAULT 1,
         bronze_threshold REAL DEFAULT 300, silver_threshold REAL DEFAULT 600,
         gold_threshold REAL DEFAULT 1000, vip_threshold REAL DEFAULT 2000,
         tier_metric TEXT DEFAULT 'spend',
@@ -187,7 +206,7 @@ async function migrate() {
         db.run(`ALTER TABLE settings ADD COLUMN ${col} ${type}`, (err) => {});
       };
       // Ensure all possible columns exist
-      const cols = ['restaurant_logo', 'enable_tiers', 'enable_milestones', 'enable_bonus', 'enable_discounts', 'enable_freebies', 'enable_retention', 'enable_frequency', 'tier_metric', 'enable_points', 'points_threshold', 'points_discount', 'points_freebie', 'freebie_bronze', 'freebie_silver', 'freebie_gold', 'freebie_vip', 'retention_freebie', 'frequency_freebie', 'milestone_visits', 'milestone_reward', 'email_welcome_subject', 'email_welcome_body', 'email_milestone_subject', 'email_milestone_body', 'email_bronze_subject', 'email_bronze_body', 'email_silver_subject', 'email_silver_body', 'email_gold_subject', 'email_gold_body', 'email_vip_subject', 'email_vip_body', 'email_retention_subject', 'email_retention_body', 'email_frequency_subject', 'email_frequency_body'];
+      const cols = ['restaurant_logo', 'enable_tiers', 'enable_milestones', 'enable_bonus', 'enable_discounts', 'enable_freebies', 'enable_retention', 'enable_frequency', 'enable_retention_discounts', 'enable_retention_freebies', 'enable_frequency_discounts', 'enable_frequency_freebies', 'enable_milestone_discounts', 'enable_milestone_freebies', 'milestone_discount', 'enable_points_discounts', 'enable_points_freebies', 'tier_metric', 'enable_points', 'points_threshold', 'points_discount', 'points_freebie', 'freebie_bronze', 'freebie_silver', 'freebie_gold', 'freebie_vip', 'retention_freebie', 'frequency_freebie', 'milestone_visits', 'milestone_reward', 'email_welcome_subject', 'email_welcome_body', 'email_milestone_subject', 'email_milestone_body', 'email_bronze_subject', 'email_bronze_body', 'email_silver_subject', 'email_silver_body', 'email_gold_subject', 'email_gold_body', 'email_vip_subject', 'email_vip_body', 'email_retention_subject', 'email_retention_body', 'email_frequency_subject', 'email_frequency_body'];
       cols.forEach(c => addCol(c, 'TEXT'));
 
       db.run(`CREATE TABLE IF NOT EXISTS customers (

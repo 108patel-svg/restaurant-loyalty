@@ -135,6 +135,11 @@ async function getSettings() {
     enable_tiers: 1, enable_milestones: 1, enable_bonus: 1,
     enable_discounts: 1, enable_freebies: 1,
     enable_retention: 1, enable_frequency: 1,
+    enable_retention_discounts: 1, enable_retention_freebies: 1,
+    enable_frequency_discounts: 1, enable_frequency_freebies: 1,
+    enable_milestone_discounts: 0, enable_milestone_freebies: 1,
+    milestone_discount: 10,
+    enable_points_discounts: 1, enable_points_freebies: 1,
     discount_new: 10, discount_bronze: 10, discount_silver: 15, discount_gold: 20, discount_vip: 25,
     bronze_threshold: 300, silver_threshold: 600, gold_threshold: 1000, vip_threshold: 2000,
     retention_days: 14, retention_discount: 10,
@@ -187,8 +192,9 @@ async function auditLog(action, details = '') {
 
 // reCAPTCHA verification
 async function verifyRecaptcha(token) {
-  const secret = process.env.RECAPTCHA_SECRET_KEY || '6LeIxAcTAAAAAGG-v3_placeholder';
-  if (secret.includes('placeholder')) return true; // Local dev bypass
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  // If no secret is configured, bypass check for testing/dev
+  if (!secret || secret === '6LeIxAcTAAAAAGG-v3_placeholder') return true;
   
   if (!token) return false;
   try {
@@ -207,7 +213,7 @@ async function verifyRecaptcha(token) {
 async function calculateBestRewards(customer, settings, isFirstVisit = false) {
   const result = { discount: 0, freebie: '', type: 'none' };
   
-  if (isFirstVisit && settings.enable_discounts) {
+  if (isFirstVisit && settings.enable_tiers && settings.enable_discounts) {
     result.discount = settings.discount_new || 10;
     result.type = 'new_customer';
     return result;
@@ -237,8 +243,10 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
         const lastVisitTs = lastVisit.visited_at instanceof Date ? lastVisit.visited_at : new Date(lastVisit.visited_at + 'Z');
         const diffDays = (new Date() - lastVisitTs) / (1000 * 60 * 60 * 24);
         if (diffDays <= (settings.retention_days || 14)) {
-          if (settings.enable_discounts) result.discount = Math.max(result.discount, settings.retention_discount || 0);
-          if (settings.enable_freebies && settings.retention_freebie) result.freebie = result.freebie ? result.freebie + ' + ' + settings.retention_freebie : settings.retention_freebie;
+          if (settings.enable_retention_discounts) result.discount = Math.max(result.discount, settings.retention_discount || 0);
+          if (settings.enable_retention_freebies && settings.retention_freebie) {
+            result.freebie = result.freebie ? result.freebie + ' + ' + settings.retention_freebie : settings.retention_freebie;
+          }
         }
       }
     }
@@ -248,8 +256,10 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
       const freqCutoff = isProd ? `NOW() - INTERVAL '${settings.frequency_days || 60} days'` : `DATETIME('now', '-${settings.frequency_days || 60} days')`;
       const recentVisits = await get(`SELECT COUNT(*) as count FROM visits WHERE customer_id = ? AND visited_at > ${freqCutoff}`, [customer.id]);
       if (recentVisits && recentVisits.count >= (settings.frequency_visits || 3)) {
-        if (settings.enable_discounts) result.discount = Math.max(result.discount, settings.frequency_discount || 0);
-        if (settings.enable_freebies && settings.frequency_freebie) result.freebie = result.freebie ? result.freebie + ' + ' + settings.frequency_freebie : settings.frequency_freebie;
+        if (settings.enable_frequency_discounts) result.discount = Math.max(result.discount, settings.frequency_discount || 0);
+        if (settings.enable_frequency_freebies && settings.frequency_freebie) {
+          result.freebie = result.freebie ? result.freebie + ' + ' + settings.frequency_freebie : settings.frequency_freebie;
+        }
       }
     }
   }
@@ -257,8 +267,8 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
   // 3. Points System
   if (settings.enable_points && settings.points_threshold > 0) {
     if (customer.points_balance >= settings.points_threshold) {
-      if (settings.enable_discounts) result.discount = Math.max(result.discount, settings.points_discount || 0);
-      if (settings.enable_freebies && settings.points_freebie) {
+      if (settings.enable_points_discounts) result.discount = Math.max(result.discount, settings.points_discount || 0);
+      if (settings.enable_points_freebies && settings.points_freebie) {
         result.freebie = result.freebie ? result.freebie + ' + ' + settings.points_freebie : settings.points_freebie;
       }
       result.type = 'points_reward';
@@ -348,6 +358,27 @@ app.post('/api/checkin-with-spend', visitLimiter, safe(async (req, res) => {
   // 3. Recalculate Tier (AFTER adding this visit)
   const tierInfo = await recalculateTier(customer.id, s);
 
+  // 3.5 Check if they hit a milestone (Xth visit)
+  let milestoneReward = null;
+  if (s.enable_milestones && s.milestone_visits > 0) {
+    const visitCountRow = await get('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?', [customer.id]);
+    const totalVisits = visitCountRow.count;
+    if (totalVisits % s.milestone_visits === 0) {
+      const mileRewards = [];
+      if (s.enable_milestone_discounts && s.milestone_discount > 0) {
+        mileRewards.push(`${s.milestone_discount}% OFF`);
+        rewards.discount = Math.max(rewards.discount, s.milestone_discount);
+      }
+      if (s.enable_milestone_freebies && s.milestone_reward) {
+        mileRewards.push(s.milestone_reward);
+        rewards.freebie = rewards.freebie ? rewards.freebie + ' + ' + s.milestone_reward : s.milestone_reward;
+      }
+      if (mileRewards.length > 0) {
+        milestoneReward = mileRewards.join(' & ');
+      }
+    }
+  }
+
   // 4. Send Email if applicable
   if (tierInfo.newTier !== customer.current_tier && tierInfo.newTier !== 'none') {
     const templateSubject = s[`email_${tierInfo.newTier}_subject`];
@@ -359,7 +390,7 @@ app.post('/api/checkin-with-spend', visitLimiter, safe(async (req, res) => {
     }
   }
 
-  res.json({ success: true, rewards, tierInfo });
+  res.json({ success: true, name: customer.name, tier: tierInfo.newTier, rewards, tierInfo, discount: rewards.discount, freebie: rewards.freebie, milestoneReward });
 }));
 
 app.get('/api/config', (req, res) => {
@@ -559,6 +590,15 @@ app.put('/api/admin/settings', adminAuth, safe(async (req, res) => {
     enableBonus: 'enable_bonus', enableDiscounts: 'enable_discounts', 
     enableFreebies: 'enable_freebies', enableRetention: 'enable_retention', 
     enableFrequency: 'enable_frequency',
+    enableRetentionDiscounts: 'enable_retention_discounts',
+    enableRetentionFreebies: 'enable_retention_freebies',
+    enableFrequencyDiscounts: 'enable_frequency_discounts',
+    enableFrequencyFreebies: 'enable_frequency_freebies',
+    enableMilestoneDiscounts: 'enable_milestone_discounts',
+    enableMilestoneFreebies: 'enable_milestone_freebies',
+    milestoneDiscount: 'milestone_discount',
+    enablePointsDiscounts: 'enable_points_discounts',
+    enablePointsFreebies: 'enable_points_freebies',
     bronze: 'bronze_threshold', silver: 'silver_threshold', 
     gold: 'gold_threshold', vip: 'vip_threshold',
     dNew: 'discount_new', dBronze: 'discount_bronze', 

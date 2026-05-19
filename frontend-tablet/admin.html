@@ -306,7 +306,7 @@
             overflow-x: auto;
         }
 
-        <table>
+        table {
             width: 100%;
             border-collapse: collapse;
             text-align: left;
@@ -317,15 +317,25 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--muted);
-            padding: 16px;
+            padding: 16px 20px;
             border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border);
             font-weight: 500;
         }
 
+        th:last-child {
+            border-right: none;
+        }
+
         td {
-            padding: 16px;
+            padding: 16px 20px;
             border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border);
             font-size: 14px;
+        }
+
+        td:last-child {
+            border-right: none;
         }
 
         tr:last-child td {
@@ -581,10 +591,6 @@
                         <span class="metric-label">Active (Last 90 days)</span>
                         <span class="metric-value" id="stat-active">0</span>
                     </div>
-                    <div class="metric-card">
-                        <span class="metric-label">90-Day Revenue</span>
-                        <span class="metric-value" id="stat-revenue">£0.00</span>
-                    </div>
                 </div>
 
                 <div class="tier-breakdown">
@@ -737,6 +743,14 @@
                                 <label>Retention (Miss you)</label>
                                 <label class="switch"><input type="checkbox" id="set-enable-retention"><span class="slider"></span></label>
                             </div>
+                            <div class="form-row">
+                                <label>Enable Discounts</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-retention-discounts"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row">
+                                <label>Enable Freebies</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-retention-freebies"><span class="slider"></span></label>
+                            </div>
                             <div class="form-row"><label>Within (days)</label><input type="number" id="set-r-days"></div>
                             <div class="form-row"><label>Disc (%)</label><input type="number" id="set-r-disc"></div>
                             <div class="form-row"><label>Freebie</label><input type="text" id="set-r-free" style="width:100px;"></div>
@@ -746,6 +760,14 @@
                             <div class="form-row">
                                 <label>Frequency (Regular)</label>
                                 <label class="switch"><input type="checkbox" id="set-enable-frequency"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row">
+                                <label>Enable Discounts</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-frequency-discounts"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row">
+                                <label>Enable Freebies</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-frequency-freebies"><span class="slider"></span></label>
                             </div>
                             <div class="form-row"><label>Visits</label><input type="number" id="set-f-count"></div>
                             <div class="form-row"><label>Days</label><input type="number" id="set-f-days"></div>
@@ -757,14 +779,33 @@
                             <h3>Milestones</h3>
                             <label class="switch"><input type="checkbox" id="set-enable-milestones"><span class="slider"></span></label>
                         </div>
-                        <div class="form-row"><label>Every X visits</label><input type="number" id="set-m-visits"></div>
-                        <div class="form-row"><label>Reward Item</label><input type="text" id="set-m-reward" style="width:120px;"></div>
+                        <div style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px;">
+                            <div class="form-row">
+                                <label>Enable Discounts</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-milestone-discounts"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row">
+                                <label>Enable Freebies</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-milestone-freebies"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row"><label>Every X visits</label><input type="number" id="set-m-visits"></div>
+                            <div class="form-row"><label>Disc (%)</label><input type="number" id="set-m-discount"></div>
+                            <div class="form-row"><label>Reward Item</label><input type="text" id="set-m-reward" style="width:120px;"></div>
+                        </div>
 
                         <div class="section-header">
                             <h3>Points System (1 £ = 1 Pt)</h3>
                             <label class="switch"><input type="checkbox" id="set-enable-points"><span class="slider"></span></label>
                         </div>
                         <div style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px;">
+                            <div class="form-row">
+                                <label>Enable Discounts</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-points-discounts"><span class="slider"></span></label>
+                            </div>
+                            <div class="form-row">
+                                <label>Enable Freebies</label>
+                                <label class="switch"><input type="checkbox" id="set-enable-points-freebies"><span class="slider"></span></label>
+                            </div>
                             <div class="form-row"><label>Points Threshold</label><input type="number" id="set-p-threshold"></div>
                             <div class="form-row"><label>Disc (%)</label><input type="number" id="set-p-disc"></div>
                             <div class="form-row"><label>Freebie Item</label><input type="text" id="set-p-free" style="width:120px;"></div>
@@ -879,9 +920,7 @@
 
             document.getElementById("search-input").addEventListener("input", async () => {
                 await renderCustomers();
-            });
-
-            document.getElementById("btn-save-settings").addEventListener("click", async () => {
+                       document.getElementById("btn-save-settings").addEventListener("click", async () => {
                 const s = {};
                 s.restaurantName = document.getElementById("set-name").value.trim();
                 s.restaurantEmail = document.getElementById("set-email").value.trim();
@@ -895,6 +934,15 @@
                 s.enableRetention = document.getElementById("set-enable-retention").checked ? 1 : 0;
                 s.enableFrequency = document.getElementById("set-enable-frequency").checked ? 1 : 0;
                 s.enableMilestones = document.getElementById("set-enable-milestones").checked ? 1 : 0;
+
+                s.enableRetentionDiscounts = document.getElementById("set-enable-retention-discounts").checked ? 1 : 0;
+                s.enableRetentionFreebies = document.getElementById("set-enable-retention-freebies").checked ? 1 : 0;
+                s.enableFrequencyDiscounts = document.getElementById("set-enable-frequency-discounts").checked ? 1 : 0;
+                s.enableFrequencyFreebies = document.getElementById("set-enable-frequency-freebies").checked ? 1 : 0;
+                s.enableMilestoneDiscounts = document.getElementById("set-enable-milestone-discounts").checked ? 1 : 0;
+                s.enableMilestoneFreebies = document.getElementById("set-enable-milestone-freebies").checked ? 1 : 0;
+                s.enablePointsDiscounts = document.getElementById("set-enable-points-discounts").checked ? 1 : 0;
+                s.enablePointsFreebies = document.getElementById("set-enable-points-freebies").checked ? 1 : 0;
 
                 s.bronze = Number(document.getElementById("set-t-bronze").value);
                 s.silver = Number(document.getElementById("set-t-silver").value);
@@ -922,6 +970,7 @@
                 s.frequencyFreebie = document.getElementById("set-f-free").value.trim();
 
                 s.milestoneVisits = Number(document.getElementById("set-m-visits").value);
+                s.milestoneDiscount = Number(document.getElementById("set-m-discount").value);
                 s.milestoneReward = document.getElementById("set-m-reward").value.trim();
 
                 s.tierMetric = document.getElementById("set-tier-metric").value;
@@ -929,7 +978,6 @@
                 s.pointsThreshold = Number(document.getElementById("set-p-threshold").value);
                 s.pointsDiscount = Number(document.getElementById("set-p-disc").value);
                 s.pointsFreebie = document.getElementById("set-p-free").value.trim();
-
                 try {
                     await App.saveSettingsData(s);
                     App.setAlert("settings-alert", "Settings saved successfully", "success");
@@ -1023,6 +1071,15 @@
                     document.getElementById("set-enable-frequency").checked = s.enable_frequency;
                     document.getElementById("set-enable-milestones").checked = s.enable_milestones;
 
+                    document.getElementById("set-enable-retention-discounts").checked = s.enable_retention_discounts !== undefined ? s.enable_retention_discounts : true;
+                    document.getElementById("set-enable-retention-freebies").checked = s.enable_retention_freebies !== undefined ? s.enable_retention_freebies : true;
+                    document.getElementById("set-enable-frequency-discounts").checked = s.enable_frequency_discounts !== undefined ? s.enable_frequency_discounts : true;
+                    document.getElementById("set-enable-frequency-freebies").checked = s.enable_frequency_freebies !== undefined ? s.enable_frequency_freebies : true;
+                    document.getElementById("set-enable-milestone-discounts").checked = s.enable_milestone_discounts !== undefined ? s.enable_milestone_discounts : false;
+                    document.getElementById("set-enable-milestone-freebies").checked = s.enable_milestone_freebies !== undefined ? s.enable_milestone_freebies : true;
+                    document.getElementById("set-enable-points-discounts").checked = s.enable_points_discounts !== undefined ? s.enable_points_discounts : true;
+                    document.getElementById("set-enable-points-freebies").checked = s.enable_points_freebies !== undefined ? s.enable_points_freebies : true;
+
                     document.getElementById("set-t-bronze").value = s.bronze_threshold;
                     document.getElementById("set-t-silver").value = s.silver_threshold;
                     document.getElementById("set-t-gold").value = s.gold_threshold;
@@ -1049,6 +1106,7 @@
                     document.getElementById("set-f-free").value = s.frequency_freebie || '';
 
                     document.getElementById("set-m-visits").value = s.milestone_visits || 5;
+                    document.getElementById("set-m-discount").value = s.milestone_discount !== undefined ? s.milestone_discount : 10;
                     document.getElementById("set-m-reward").value = s.milestone_reward || 'Free Coffee';
 
                     document.getElementById("set-tier-metric").value = s.tier_metric || 'spend';
@@ -1065,7 +1123,10 @@
                     document.getElementById("stat-total-cust").innerText = stats.totalCustomers;
                     document.getElementById("stat-today-cust").innerText = stats.visitedToday;
                     document.getElementById("stat-active").innerText = stats.active90d;
-                    document.getElementById("stat-revenue").innerText = `£${Number(stats.revenue90d || 0).toFixed(2)}`;
+                    const revEl = document.getElementById("stat-revenue");
+                    if (revEl) {
+                        revEl.innerText = `£${Number(stats.revenue90d || 0).toFixed(2)}`;
+                    }
 
                     document.getElementById("count-vip").innerText = stats.tierCounts.vip;
                     document.getElementById("count-gold").innerText = stats.tierCounts.gold;
