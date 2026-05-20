@@ -74,7 +74,10 @@ const query = (sql, params = []) => {
 };
 
 const NOW = isProd ? "CURRENT_TIMESTAMP" : "DATETIME('now')";
-const DAYS_90_AGO = isProd ? "CURRENT_TIMESTAMP - INTERVAL '90 days'" : "DATETIME('now', '-90 days')";
+function getDaysAgoClause(days) {
+  const d = parseInt(days) || 90;
+  return isProd ? `CURRENT_TIMESTAMP - INTERVAL '${d} days'` : `DATETIME('now', '-${d} days')`;
+}
 const TODAY = isProd ? "CURRENT_DATE" : "DATE('now')";
 
 // Middleware
@@ -144,7 +147,9 @@ async function getSettings() {
     bronze_threshold: 300, silver_threshold: 600, gold_threshold: 1000, vip_threshold: 2000,
     retention_days: 14, retention_discount: 10,
     frequency_visits: 3, frequency_days: 60, frequency_discount: 10,
-    milestone_visits: 5, milestone_reward: 'Free Coffee'
+    milestone_visits: 5, milestone_reward: 'Free Coffee',
+    portal_name: 'Rewards Portal',
+    tier_window_days: 90
   };
 }
 
@@ -281,10 +286,11 @@ async function calculateBestRewards(customer, settings, isFirstVisit = false) {
 async function recalculateTier(customerId, settings) {
   if (!settings.enable_tiers) return { newTier: 'none', spend90d: 0, visitCount: 0 };
   
+  const daysAgoClause = getDaysAgoClause(settings.tier_window_days);
   const row = await get(`
     SELECT SUM(spend) as total_90d, COUNT(id) as visit_count 
     FROM visits 
-    WHERE customer_id = ? AND visited_at > ${DAYS_90_AGO}
+    WHERE customer_id = ? AND visited_at > ${daysAgoClause}
   `, [customerId]);
 
   if (!row) return { newTier: 'none', spend90d: 0, visitCount: 0 };
@@ -393,11 +399,13 @@ app.post('/api/checkin-with-spend', visitLimiter, safe(async (req, res) => {
   res.json({ success: true, name: customer.name, tier: tierInfo.newTier, rewards, tierInfo, discount: rewards.discount, freebie: rewards.freebie, milestoneReward });
 }));
 
-app.get('/api/config', (req, res) => {
+app.get('/api/config', safe(async (req, res) => {
+  const s = await getSettings();
   res.json({
-    recaptchaSiteKey: process.env.RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
+    recaptchaSiteKey: process.env.RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',
+    portalName: s.portal_name || 'Rewards Portal'
   });
-});
+}));
 
 const getStatus = safe(async (req, res) => {
   const email = req.query.email?.toLowerCase().trim();
@@ -428,6 +436,133 @@ const getStatus = safe(async (req, res) => {
   
   const progressPercent = nextTier === 'max' ? 100 : Math.min(100, Math.max(0, ((currentMetric - prevThreshold) / (nextThreshold - prevThreshold)) * 100));
 
+  const activeRewardsList = [];
+
+  // 1. Tier Rewards
+  if (s.enable_tiers && tierInfo.newTier !== 'none') {
+    const tier = tierInfo.newTier;
+    const tierDiscounts = {
+      'none': 0, 'bronze': s.discount_bronze, 'silver': s.discount_silver,
+      'gold': s.discount_gold, 'vip': s.discount_vip
+    };
+    const tierFreebies = {
+      'none': '', 'bronze': s.freebie_bronze, 'silver': s.freebie_silver,
+      'gold': s.freebie_gold, 'vip': s.freebie_vip
+    };
+    const disc = tierDiscounts[tier] || 0;
+    const freebie = tierFreebies[tier] || '';
+    if (s.enable_discounts && disc > 0) {
+      activeRewardsList.push({
+        source: 'Tier Status',
+        type: 'discount',
+        value: `${disc}% OFF`,
+        description: `Active ${tier.charAt(0).toUpperCase() + tier.slice(1)} status discount`
+      });
+    }
+    if (s.enable_freebies && freebie) {
+      activeRewardsList.push({
+        source: 'Tier Status',
+        type: 'freebie',
+        value: freebie,
+        description: `Active ${tier.charAt(0).toUpperCase() + tier.slice(1)} status freebie`
+      });
+    }
+  }
+
+  // 2. Retention Reward
+  if (s.enable_bonus && s.enable_retention) {
+    const lastVisitRow = await get(`SELECT visited_at FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT 1`, [customer.id]);
+    if (lastVisitRow) {
+      const lastVisitTs = lastVisitRow.visited_at instanceof Date ? lastVisitRow.visited_at : new Date(lastVisitRow.visited_at + 'Z');
+      const diffDays = (new Date() - lastVisitTs) / (1000 * 60 * 60 * 24);
+      if (diffDays <= (s.retention_days || 14)) {
+        if (s.enable_retention_discounts && s.retention_discount > 0) {
+          activeRewardsList.push({
+            source: 'Retention Bonus',
+            type: 'discount',
+            value: `${s.retention_discount}% OFF`,
+            description: `Returned within ${s.retention_days || 14} days`
+          });
+        }
+        if (s.enable_retention_freebies && s.retention_freebie) {
+          activeRewardsList.push({
+            source: 'Retention Bonus',
+            type: 'freebie',
+            value: s.retention_freebie,
+            description: `Returned within ${s.retention_days || 14} days`
+          });
+        }
+      }
+    }
+  }
+
+  // 3. Frequency Reward
+  if (s.enable_bonus && s.enable_frequency) {
+    const freqCutoff = isProd ? `NOW() - INTERVAL '${s.frequency_days || 60} days'` : `DATETIME('now', '-${s.frequency_days || 60} days')`;
+    const recentVisits = await get(`SELECT COUNT(*) as count FROM visits WHERE customer_id = ? AND visited_at > ${freqCutoff}`, [customer.id]);
+    if (recentVisits && recentVisits.count >= (s.frequency_visits || 3)) {
+      if (s.enable_frequency_discounts && s.frequency_discount > 0) {
+        activeRewardsList.push({
+          source: 'Frequency Bonus',
+          type: 'discount',
+          value: `${s.frequency_discount}% OFF`,
+          description: `Visited ${recentVisits.count} times in last ${s.frequency_days || 60} days`
+        });
+      }
+      if (s.enable_frequency_freebies && s.frequency_freebie) {
+        activeRewardsList.push({
+          source: 'Frequency Bonus',
+          type: 'freebie',
+          value: s.frequency_freebie,
+          description: `Visited ${recentVisits.count} times in last ${s.frequency_days || 60} days`
+        });
+      }
+    }
+  }
+
+  // 4. Points Reward
+  if (s.enable_points && s.points_threshold > 0 && customer.points_balance >= s.points_threshold) {
+    if (s.enable_points_discounts && s.points_discount > 0) {
+      activeRewardsList.push({
+        source: 'Points System',
+        type: 'discount',
+        value: `${s.points_discount}% OFF`,
+        description: `Earned from reaching ${s.points_threshold} points`
+      });
+    }
+    if (s.enable_points_freebies && s.points_freebie) {
+      activeRewardsList.push({
+        source: 'Points System',
+        type: 'freebie',
+        value: s.points_freebie,
+        description: `Earned from reaching ${s.points_threshold} points`
+      });
+    }
+  }
+
+  // 5. Milestone Reward (Next Check-in)
+  if (s.enable_milestones && s.milestone_visits > 0) {
+    const totalVisits = visits.count;
+    if ((totalVisits + 1) % s.milestone_visits === 0) {
+      if (s.enable_milestone_discounts && s.milestone_discount > 0) {
+        activeRewardsList.push({
+          source: 'Milestone (Next Check-in)',
+          type: 'discount',
+          value: `${s.milestone_discount}% OFF`,
+          description: `On your ${totalVisits + 1}th visit milestone!`
+        });
+      }
+      if (s.enable_milestone_freebies && s.milestone_reward) {
+        activeRewardsList.push({
+          source: 'Milestone (Next Check-in)',
+          type: 'freebie',
+          value: s.milestone_reward,
+          description: `On your ${totalVisits + 1}th visit milestone!`
+        });
+      }
+    }
+  }
+
   res.json({
     found: true,
     name: customer.name,
@@ -454,6 +589,7 @@ const getStatus = safe(async (req, res) => {
     progressPercent: Math.round(progressPercent),
     enable_discounts: s.enable_discounts,
     enable_freebies: s.enable_freebies,
+    activeRewardsList,
     settings: {
       bronze: s.bronze_threshold, silver: s.silver_threshold, gold: s.gold_threshold, vip: s.vip_threshold,
       enableTiers: s.enable_tiers, enableDiscounts: s.enable_discounts, enableFreebies: s.enable_freebies,
@@ -489,10 +625,12 @@ const adminAuth = async (req, res, next) => {
 };
 
 app.get('/api/admin/stats', adminAuth, safe(async (req, res) => {
+  const s = await getSettings();
+  const daysAgoClause = getDaysAgoClause(s.tier_window_days);
   const total = await get('SELECT COUNT(*) as count FROM customers');
   const today = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE ${isProd ? "visited_at::date = CURRENT_DATE" : "DATE(visited_at) = DATE('now')"}`);
-  const active = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE visited_at > ${DAYS_90_AGO}`);
-  const revenue = await get(`SELECT SUM(spend) as sum FROM visits WHERE visited_at > ${DAYS_90_AGO}`);
+  const active = await get(`SELECT COUNT(DISTINCT customer_id) as count FROM visits WHERE visited_at > ${daysAgoClause}`);
+  const revenue = await get(`SELECT SUM(spend) as sum FROM visits WHERE visited_at > ${daysAgoClause}`);
   
   const tiers = await query('SELECT current_tier, COUNT(*) as count FROM customers GROUP BY current_tier');
   const tierCounts = { vip: 0, gold: 0, silver: 0, bronze: 0, none: 0 };
@@ -511,15 +649,28 @@ app.get('/api/admin/stats', adminAuth, safe(async (req, res) => {
     active90d: active.count,
     revenue90d: Number(revenue.sum || 0),
     tierCounts,
-    recentVisits: recent.map(r => ({ ...r, date: new Date(r.ts + 'Z').toLocaleString('en-GB') }))
+    recentVisits: recent.map(r => {
+      let dateStr = 'Unknown';
+      try {
+        const d = r.ts instanceof Date ? r.ts : new Date(r.ts + 'Z');
+        if (!isNaN(d.getTime())) {
+          dateStr = d.toLocaleString('en-GB');
+        }
+      } catch (e) {
+        console.error('Date format error:', e);
+      }
+      return { ...r, date: dateStr };
+    })
   });
 }));
 
 app.get('/api/admin/customers', adminAuth, safe(async (req, res) => {
   const { search } = req.query;
+  const s = await getSettings();
+  const daysAgoClause = getDaysAgoClause(s.tier_window_days);
   let sql = `
     SELECT c.*, 
-    COALESCE(SUM(CASE WHEN v.visited_at > ${DAYS_90_AGO} THEN v.spend ELSE 0 END), 0) as spend_90d,
+    COALESCE(SUM(CASE WHEN v.visited_at > ${daysAgoClause} THEN v.spend ELSE 0 END), 0) as spend_90d,
     COUNT(v.id) as visit_count
     FROM customers c
     LEFT JOIN visits v ON c.id = v.customer_id
@@ -612,7 +763,8 @@ app.put('/api/admin/settings', adminAuth, safe(async (req, res) => {
     milestoneVisits: 'milestone_visits', milestoneReward: 'milestone_reward',
     tierMetric: 'tier_metric',
     enablePoints: 'enable_points', pointsThreshold: 'points_threshold',
-    pointsDiscount: 'points_discount', pointsFreebie: 'points_freebie'
+    pointsDiscount: 'points_discount', pointsFreebie: 'points_freebie',
+    portalName: 'portal_name', tierWindowDays: 'tier_window_days'
   };
 
   // Add email templates to map
